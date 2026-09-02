@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in — ISKCON Shirpur{% endblock %}
+
+{% block content %}
+
+<div style="max-width: 440px; margin: 3rem auto;">
+    <div class="card">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <div class="brand-icon" style="margin: 0 auto 0.75rem; width: 42px; height: 42px; font-size: 1.2rem;">🪷</div>
+            <h1 style="font-family: var(--font-display); font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em;">Welcome back</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Sign in to ISKCON Shirpur Mindful Finance</p>
+        </div>
+
+        {% if error %}
+            <div class="alert alert-danger" style="margin-bottom: 1.25rem;">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="form-group">
+                <label for="email" class="form-label">Email address</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="nitish@example.com" value="demo@spendly.io" required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <label for="password" class="form-label" style="margin-bottom: 0;">Password</label>
+                    <a href="{{ url_for('forgot_password') }}" style="font-size: 0.8rem; color: var(--primary);">Forgot password?</a>
+                </div>
+                <input type="password" id="password" name="password" class="form-input" placeholder="Your password" value="password123" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+                Sign in to Dashboard →
+            </button>
+        </form>
+
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+            Don't have an account? Contact your temple administrator for access.
+        </p>
+    </div>
+</div>
+
+{% endblock %}

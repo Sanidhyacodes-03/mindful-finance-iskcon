@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy — Spendly{% endblock %}
+
+{% block content %}
+
+<div class="page-header" style="max-width: 800px; margin: 0 auto 2rem;">
+    <div>
+        <h1 class="page-title">Privacy Policy</h1>
+        <p class="page-subtitle">Your privacy and data security are our top priorities.</p>
+    </div>
+</div>
+
+<div class="card" style="max-width: 800px; margin: 0 auto 2rem; line-height: 1.8;">
+    <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">1. Information We Collect</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+        Spendly collects account identifiers (name, email, hashed passwords) and user-submitted financial transactions, categories, budgets, and goals to provide real-time expense analytics.
+    </p>
+
+    <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">2. How We Use Data</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+        Your transaction details are processed locally by our AI calculation engine to project 30-day cash flow forecasts, calculate financial health scores, and generate behavioral spending insight alerts.
+    </p>
+
+    <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">3. Data Security & Storage</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+        All user passwords are stored using salted Werkzeug cryptographic hashes. Database queries are fully parameterized to prevent SQL injection vulnerabilities.
+    </p>
+
+    <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+        <a href="{{ url_for('landing') }}" class="btn btn-secondary">← Back to Home</a>
+    </div>
+</div>
+
+{% endblock %}

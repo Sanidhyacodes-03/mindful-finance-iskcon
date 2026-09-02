@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ISKCON Shirpur — Mindful Expense Tracker{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/spiritual.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+    <!-- SpiritualSplashScreen -->
+    <div id="spiritual-splash" class="spiritual-splash" aria-hidden="true" role="dialog" aria-label="Welcome splash">
+        <div class="spiritual-splash__glow" aria-hidden="true"></div>
+        <div id="splash-particles" class="spiritual-splash__particles" aria-hidden="true"></div>
+        <div id="splash-petals" class="flower-petal-container" aria-hidden="true"></div>
+
+        <div class="spiritual-splash__content">
+            <div class="krishna-hero">
+                <div class="krishna-hero__halo" aria-hidden="true"></div>
+                <div class="krishna-hero__frame">
+                    <img
+                        src="{{ url_for('static', filename='images/WhatsApp Image 2026-08-27 at 3.09.57 PM.jpeg') }}"
+                        alt="Shree Krishna"
+                        class="krishna-hero__image"
+                        width="280"
+                        height="373"
+                        loading="eager"
+                    >
+                </div>
+            </div>
+
+            <p class="splash-text splash-text--mantra">हरे कृष्ण</p>
+            <p class="splash-text splash-text--welcome">Welcome to ISKCON Shirpur</p>
+            <p class="splash-text splash-text--subtitle">Manage your finances with mindfulness</p>
+        </div>
+
+        <button type="button" id="splash-skip" class="spiritual-splash__skip" aria-label="Skip splash screen">
+            Skip →
+        </button>
+    </div>
+
+    <!-- SpiritualBackground + App Shell -->
+    {% if show_bg_carousel %}
+        <div class="bg-carousel" aria-hidden="true">
+            <div class="bg-carousel__slide bg-carousel__slide--a"></div>
+            <div class="bg-carousel__slide bg-carousel__slide--b"></div>
+        </div>
+        <div class="bg-carousel__overlay" aria-hidden="true"></div>
+        <script>
+        (function () {
+            var images = {{ background_images | tojson }};
+            if (!images.length) return;
+            for (var i = images.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = images[i]; images[i] = images[j]; images[j] = tmp;
+            }
+            document.addEventListener('DOMContentLoaded', function () {
+                var slides = [
+                    document.querySelector('.bg-carousel__slide--a'),
+                    document.querySelector('.bg-carousel__slide--b')
+                ];
+                var order = images.length > 1 ? images : images.concat(images);
+                var idx = 0;
+                var active = 0;
+                slides[active].style.backgroundImage = "url('" + order[0] + "')";
+                slides[active].classList.add('is-active');
+                setInterval(function () {
+                    idx = (idx + 1) % order.length;
+                    var next = 1 - active;
+                    slides[next].style.backgroundImage = "url('" + order[idx] + "')";
+                    slides[next].classList.add('is-active');
+                    slides[active].classList.remove('is-active');
+                    active = next;
+                }, 7000);
+            });
+        })();
+        </script>
+    {% else %}
+        <div class="spiritual-bg" aria-hidden="true"></div>
+    {% endif %}
+    <div id="dashboard-petals" class="dashboard-petals" aria-hidden="true"></div>
+
+    <div id="app-shell">
+        <nav class="navbar">
+            <div class="nav-inner">
+                <a href="{{ url_for('landing') }}" class="nav-brand">
+                    <span class="brand-icon">🪷</span>
+                    <span>
+                        <span class="brand-name">ISKCON Shirpur</span>
+                        <span class="nav-brand__subtitle">Mindful Finance</span>
+                    </span>
+                </a>
+
+                <div class="nav-links">
+                    {% if g.user %}
+                        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+                        {% if g.user['role'] != 'manager' %}
+                            <a href="{{ url_for('departments') }}" class="nav-link {% if request.endpoint == 'departments' %}active{% endif %}">Departments</a>
+                        {% endif %}
+                        <a href="{{ url_for('expenses') }}" class="nav-link {% if request.endpoint == 'expenses' %}active{% endif %}">Expenses</a>
+                        <a href="{{ url_for('budgets') }}" class="nav-link {% if request.endpoint == 'budgets' %}active{% endif %}">Budgets</a>
+                        {% if g.user['role'] != 'manager' %}
+                            <a href="{{ url_for('activity_log') }}" class="nav-link {% if request.endpoint == 'activity_log' %}active{% endif %}">Activity Log</a>
+                            <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
+                        {% endif %}
+                        {% if g.user['role'] == 'admin' %}
+                            <a href="{{ url_for('manage_users') }}" class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}">Manage Users</a>
+                        {% endif %}
+
+                        <a href="{{ url_for('alerts') }}" class="notification-badge" title="Alerts &amp; Queries">
+                            🔔
+                            {% if g.unresolved_alerts_count > 0 %}
+                                <span class="unread-count">{{ g.unresolved_alerts_count }}</span>
+                            {% endif %}
+                        </a>
+
+                        <a href="{{ url_for('profile') }}" class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}">👤 {{ g.user['name'].split()[0] }}</a>
+                        <a href="{{ url_for('logout') }}" class="nav-link" style="color: var(--rose);">Sign out</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="nav-cta">Sign in</a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-container">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <main class="main-content animate-fade-in">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <div class="footer-inner">
+                <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: var(--text-main);">
+                    <span class="brand-icon" style="width: 24px; height: 24px; font-size: 0.8rem;">🪷</span>
+                    <span>ISKCON Shirpur Finance</span>
+                </div>
+                <p>Mindful Expense Management — हरे कृष्ण</p>
+                <div class="footer-links">
+                    <a href="{{ url_for('terms') }}">Terms of Service</a>
+                    <a href="{{ url_for('privacy') }}">Privacy Policy</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/spiritual.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Profile Settings — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Profile & Settings</h1>
+        <p class="page-subtitle">Manage your account preferences.</p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h3 class="card-title" style="margin-bottom: 1.25rem;">Account Information</h3>
+
+        <form method="POST" action="{{ url_for('profile') }}">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" class="form-input" value="{{ user.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" class="form-input" value="{{ user.email }}" disabled style="background: var(--bg-subtle);">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Email address cannot be changed.</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Role</label>
+                <input type="text" class="form-input" value="{{ user.role|capitalize }}" disabled style="background: var(--bg-subtle);">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Roles are managed by an Administrator.</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">WhatsApp Number</label>
+                <input type="tel" name="phone" class="form-input" value="{{ user.phone_number or '' }}" placeholder="+91XXXXXXXXXX">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Include country code. Required to receive WhatsApp alerts.</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">WhatsApp Notifications</label>
+                <select name="whatsapp_notify_mode" class="form-input">
+                    <option value="all" {% if user.whatsapp_notify_mode == 'all' %}selected{% endif %}>Notify me for every login</option>
+                    <option value="large_only" {% if user.whatsapp_notify_mode == 'large_only' or not user.whatsapp_notify_mode %}selected{% endif %}>Only for important events</option>
+                    <option value="off" {% if user.whatsapp_notify_mode == 'off' %}selected{% endif %}>Off</option>
+                </select>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+
+            <h3 class="card-title" style="margin-bottom: 1rem; font-size: 1rem;">Change Password</h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">Leave blank to keep your current password.</p>
+
+            <div class="form-group">
+                <label class="form-label">Current Password</label>
+                <input type="password" name="current_password" class="form-input" autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input type="password" name="new_password" class="form-input" minlength="6" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Confirm New Password</label>
+                <input type="password" name="confirm_password" class="form-input" minlength="6" autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 0.5rem;">Save Changes</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3 class="card-title" style="margin-bottom: 1.25rem;">Security & Session</h3>
+        <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Account created on: <strong>{{ user.created_at }}</strong>
+        </div>
+
+        <div style="background: var(--bg-subtle); padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+            🔒 Passwords are stored securely using Argon2 password hashing.
+        </div>
+
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary" style="color: var(--rose);">
+            Sign Out of Account
+        </a>
+    </div>
+</div>
+
+{% endblock %}

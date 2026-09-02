@@ -1,0 +1,219 @@
+import os
+import io
+import csv
+from datetime import datetime
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+)
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+from database.db import get_db
+
+FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "fonts")
+FONT_REGULAR = "DejaVuSans"
+FONT_BOLD = "DejaVuSans-Bold"
+
+_fonts_registered = False
+
+
+def _ensure_fonts():
+    """Register the bundled DejaVu fonts once (reportlab's built-in fonts can't render the rupee sign)."""
+    global _fonts_registered
+    if _fonts_registered:
+        return
+    pdfmetrics.registerFont(TTFont(FONT_REGULAR, os.path.join(FONT_DIR, "DejaVuSans.ttf")))
+    pdfmetrics.registerFont(TTFont(FONT_BOLD, os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")))
+    _fonts_registered = True
+
+
+def _fetch_report_rows(department_id, start_date, end_date):
+    db = get_db()
+    cursor = db.cursor()
+
+    query = """
+        SELECT e.date, e.description, d.name as department_name, e.payment_method, e.amount, u.name as added_by_name
+        FROM expenses e
+        JOIN departments d ON e.department_id = d.id
+        LEFT JOIN users u ON e.added_by = u.id
+        WHERE e.date >= ? AND e.date <= ?
+    """
+    params = [start_date, end_date]
+    if department_id:
+        query += " AND e.department_id = ?"
+        params.append(department_id)
+    query += " ORDER BY e.date ASC, e.id ASC"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+
+    dept_query = """
+        SELECT d.name as department_name, SUM(e.amount) as total
+        FROM expenses e
+        JOIN departments d ON e.department_id = d.id
+        WHERE e.date >= ? AND e.date <= ?
+    """
+    dept_params = [start_date, end_date]
+    if department_id:
+        dept_query += " AND e.department_id = ?"
+        dept_params.append(department_id)
+    dept_query += " GROUP BY d.id ORDER BY total DESC"
+    cursor.execute(dept_query, dept_params)
+    department_totals = cursor.fetchall()
+
+    department_name = "All Departments"
+    if department_id:
+        cursor.execute("SELECT name FROM departments WHERE id = ?", (department_id,))
+        dept_row = cursor.fetchone()
+        if dept_row:
+            department_name = dept_row['name']
+
+    db.close()
+    return rows, department_totals, department_name
+
+
+class ReportService:
+
+    @staticmethod
+    def generate_department_pdf(department_id, start_date, end_date, generated_by_name):
+        """
+        Builds a statement PDF of department expenses between start_date and end_date
+        (inclusive, 'YYYY-MM-DD' strings). department_id=None means all departments.
+        Returns raw PDF bytes.
+        """
+        _ensure_fonts()
+
+        rows, department_totals, department_name = _fetch_report_rows(department_id, start_date, end_date)
+        total_spent = sum(r['amount'] for r in rows) if rows else 0.0
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            topMargin=18 * mm, bottomMargin=18 * mm,
+            leftMargin=16 * mm, rightMargin=16 * mm,
+            title="ISKCON Shirpur Department Expense Statement"
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("ReportTitle", parent=styles["Title"], fontName=FONT_BOLD, fontSize=20, spaceAfter=2)
+        sub_style = ParagraphStyle("ReportSub", parent=styles["Normal"], fontName=FONT_REGULAR, fontSize=9, textColor=colors.HexColor("#6b7280"))
+        h2_style = ParagraphStyle("ReportH2", parent=styles["Heading2"], fontName=FONT_BOLD, fontSize=12, spaceBefore=14, spaceAfter=6)
+        normal_style = ParagraphStyle("ReportNormal", parent=styles["Normal"], fontName=FONT_REGULAR, fontSize=9.5)
+        cell_style = ParagraphStyle("ReportCell", parent=styles["Normal"], fontName=FONT_REGULAR, fontSize=9)
+        cell_bold = ParagraphStyle("ReportCellBold", parent=styles["Normal"], fontName=FONT_BOLD, fontSize=9)
+
+        story = []
+
+        story.append(Paragraph("ISKCON Shirpur", title_style))
+        story.append(Paragraph("Department Expense Statement", sub_style))
+        story.append(Spacer(1, 10))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e5e7eb")))
+        story.append(Spacer(1, 10))
+
+        story.append(Paragraph("Statement Details", h2_style))
+        info_table_data = [
+            [Paragraph("<b>Department</b>", cell_style), Paragraph(department_name, cell_style)],
+            [Paragraph("<b>Period</b>", cell_style), Paragraph(f"{start_date} to {end_date}", cell_style)],
+            [Paragraph("<b>Generated On</b>", cell_style), Paragraph(datetime.now().strftime("%Y-%m-%d %H:%M"), cell_style)],
+            [Paragraph("<b>Generated By</b>", cell_style), Paragraph(generated_by_name or "-", cell_style)],
+        ]
+        info_table = Table(info_table_data, colWidths=[130, 340])
+        info_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 14))
+
+        story.append(Paragraph("Transactions", h2_style))
+
+        if rows:
+            table_data = [[
+                Paragraph("<b>Date</b>", cell_bold),
+                Paragraph("<b>Description</b>", cell_bold),
+                Paragraph("<b>Department</b>", cell_bold),
+                Paragraph("<b>Payment Method</b>", cell_bold),
+                Paragraph("<b>Amount (₹)</b>", cell_bold),
+            ]]
+            for r in rows:
+                table_data.append([
+                    Paragraph(r['date'], cell_style),
+                    Paragraph(r['description'] or "-", cell_style),
+                    Paragraph(r['department_name'], cell_style),
+                    Paragraph(r['payment_method'] or "-", cell_style),
+                    Paragraph(f"{r['amount']:,.2f}", cell_style),
+                ])
+
+            txn_table = Table(table_data, colWidths=[62, 133, 105, 90, 80], repeatRows=1)
+            txn_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4f46e5")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+                ("ALIGN", (4, 0), (4, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]))
+            story.append(txn_table)
+        else:
+            story.append(Paragraph("No transactions found for this period.", normal_style))
+
+        story.append(Spacer(1, 16))
+        story.append(Paragraph("Summary by Department", h2_style))
+
+        summary_data = [[Paragraph("<b>Department</b>", cell_bold), Paragraph("<b>Total (₹)</b>", cell_bold)]]
+        for row in department_totals:
+            summary_data.append([
+                Paragraph(row['department_name'], cell_style),
+                Paragraph(f"{row['total']:,.2f}", cell_style),
+            ])
+        summary_data.append([
+            Paragraph("<b>Total Spent</b>", cell_bold),
+            Paragraph(f"<b>{total_spent:,.2f}</b>", cell_bold),
+        ])
+
+        summary_table = Table(summary_data, colWidths=[340, 130])
+        summary_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4f46e5")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
+            ("LINEABOVE", (0, -1), (-1, -1), 1, colors.HexColor("#4f46e5")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(summary_table)
+
+        story.append(Spacer(1, 24))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#e5e7eb")))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(
+            "This is a system-generated statement from the ISKCON Shirpur Finance system for record-keeping purposes.",
+            sub_style
+        ))
+
+        doc.build(story)
+        pdf_bytes = buf.getvalue()
+        buf.close()
+        return pdf_bytes
+
+    @staticmethod
+    def generate_csv(department_id, start_date, end_date):
+        """Returns a CSV string of department expenses between start_date and end_date."""
+        rows, _, _ = _fetch_report_rows(department_id, start_date, end_date)
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["Date", "Department", "Description", "Payment Method", "Amount", "Added By"])
+        for r in rows:
+            writer.writerow([r['date'], r['department_name'], r['description'], r['payment_method'], f"{r['amount']:.2f}", r['added_by_name'] or "-"])
+
+        return buf.getvalue()

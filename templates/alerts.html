@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts & Queries — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Alerts & Queries</h1>
+        <p class="page-subtitle">Department alerts and questions raised about specific expense records.</p>
+    </div>
+    {% if g.user['role'] in ('admin', 'auditor') %}
+    <button onclick="openModal('addAlertModal')" class="btn btn-primary">
+        + New Alert / Query
+    </button>
+    {% endif %}
+</div>
+
+<!-- Filters -->
+<div class="card card--spiritual card--animate-in" style="margin-bottom: 2rem;">
+    <form method="GET" action="{{ url_for('alerts') }}" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 160px;">
+            <label class="form-label">Department</label>
+            <select name="department" class="form-select">
+                <option value="">All Departments</option>
+                {% for d in departments %}
+                    <option value="{{ d.id }}" {% if selected_department == (d.id|string) %}selected{% endif %}>{{ d.icon }} {{ d.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="flex: 1; min-width: 140px;">
+            <label class="form-label">Type</label>
+            <select name="type" class="form-select">
+                <option value="">All Types</option>
+                <option value="alert" {% if selected_type == 'alert' %}selected{% endif %}>Alert</option>
+                <option value="query" {% if selected_type == 'query' %}selected{% endif %}>Query</option>
+            </select>
+        </div>
+        <div style="flex: 1; min-width: 140px;">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-select">
+                <option value="">All</option>
+                <option value="open" {% if selected_status == 'open' %}selected{% endif %}>Open</option>
+                <option value="resolved" {% if selected_status == 'resolved' %}selected{% endif %}>Resolved</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-secondary">Filter</button>
+            <a href="{{ url_for('alerts') }}" class="btn btn-secondary" style="color: var(--text-muted);">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="grid-2">
+    {% for a in alerts %}
+    {% set sev_color = {'critical': 'var(--rose)', 'warning': 'var(--amber)', 'info': 'var(--saffron)'}[a.severity] %}
+    <div class="card card--spiritual card--animate-in" style="{% if a.is_resolved %}opacity: 0.65;{% endif %}">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="stat-badge" style="background: {{ sev_color }}15; color: {{ sev_color }};">
+                    {{ '❓ Query' if a.type == 'query' else '🔔 Alert' }} · {{ a.severity|capitalize }}
+                </span>
+                {% if a.is_resolved %}<span class="stat-badge positive">Resolved</span>{% endif %}
+            </div>
+        </div>
+        <h3 class="card-title" style="margin-bottom: 0.4rem;">{{ a.title }}</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">{{ a.message }}</p>
+
+        <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.75rem;">
+            {% if a.department_name %}<span>🏛️ {{ a.department_name }}</span>{% endif %}
+            {% if a.expense_description %}<span>🧾 Tagged expense: {{ a.expense_description }} (₹{{ "{:,.2f}".format(a.expense_amount) }})</span>{% endif %}
+            <span>Raised by {{ a.created_by_name or 'System' }} on {{ a.created_at }}</span>
+            {% if a.is_resolved %}<span>Resolved by {{ a.resolved_by_name or 'System' }} on {{ a.resolved_at }}</span>{% endif %}
+        </div>
+
+        {% if g.user['role'] == 'admin' and not a.is_resolved %}
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <form method="POST" action="{{ url_for('resolve_alert', id=a.id) }}">
+                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Mark Resolved</button>
+            </form>
+            <form method="POST" action="{{ url_for('delete_alert', id=a.id) }}" onsubmit="return confirm('Delete this entry?');">
+                <button type="submit" class="btn btn-danger" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Delete</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align: center; color: var(--text-muted); padding: 3rem;">No alerts or queries yet.</div>
+    {% endfor %}
+</div>
+
+{% if g.user['role'] in ('admin', 'auditor') %}
+<!-- Add Alert/Query Modal -->
+<div class="modal-overlay" id="addAlertModal">
+    <div class="modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">New Alert / Query</h3>
+            <button onclick="closeModal('addAlertModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('add_alert') }}">
+            <div class="form-group">
+                <label class="form-label">Type</label>
+                <select name="type" class="form-select">
+                    <option value="alert">Department Alert</option>
+                    <option value="query">Query on an Expense</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Target</label>
+                <select name="department_id" class="form-select">
+                    <option value="">— Admins / Org-wide —</option>
+                    {% for d in departments %}
+                        <option value="{{ d.id }}">{{ d.icon }} {{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Tag a specific expense (optional, for queries)</label>
+                <select name="expense_id" class="form-select">
+                    <option value="">— None —</option>
+                    {% for e in recent_expenses %}
+                        <option value="{{ e.id }}">{{ e.description }} — ₹{{ "{:,.2f}".format(e.amount) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" name="title" class="form-input" placeholder="Short summary" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Message</label>
+                <textarea name="message" class="form-input" rows="3" placeholder="Details of the alert or question" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Severity</label>
+                <select name="severity" class="form-select">
+                    <option value="info">Info</option>
+                    <option value="warning">Warning</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Create</button>
+                <button type="button" onclick="closeModal('addAlertModal')" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

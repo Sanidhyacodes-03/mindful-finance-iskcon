@@ -1,0 +1,473 @@
+/* ================================================================== */
+/* ISKCON SHIRPUR — Spiritual Splash, Petals & Background Elements    */
+/* ================================================================== */
+
+/* --- Subtle page background (SpiritualBackground) --- */
+.spiritual-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(212, 168, 67, 0.12) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(13, 148, 136, 0.06) 0%, transparent 50%),
+        var(--bg-page);
+}
+
+.spiritual-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23c47a2a' stroke-width='0.5'%3E%3Ccircle cx='60' cy='60' r='28'/%3E%3Ccircle cx='60' cy='60' r='18'/%3E%3Cpath d='M60 32 L60 88 M32 60 L88 60 M42 42 L78 78 M78 42 L42 78'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 120px 120px;
+}
+
+/* --- Rotating photo background carousel (landing/login/auth pages only) --- */
+.bg-carousel {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background: var(--bg-page);
+}
+
+.bg-carousel__slide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 1.8s ease;
+}
+
+.bg-carousel__slide.is-active {
+    opacity: 1;
+}
+
+.bg-carousel__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(45, 27, 14, 0.55) 0%, rgba(45, 27, 14, 0.35) 45%, rgba(45, 27, 14, 0.65) 100%),
+        radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232, 149, 46, 0.25) 0%, transparent 60%);
+}
+
+/* --- App shell hidden during splash --- */
+#app-shell.app-shell--splash-pending {
+    opacity: 0;
+    transform: scale(0.98);
+    pointer-events: none;
+}
+
+#app-shell.app-shell--revealed {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+    transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ================================================================== */
+/* SpiritualSplashScreen                                              */
+/* ================================================================== */
+
+.spiritual-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(165deg, #faf6ef 0%, #f5ebe0 35%, #f0e4d4 70%, #ebe0cf 100%);
+    transition: opacity 0.85s ease, visibility 0.85s ease;
+}
+
+.spiritual-splash.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.spiritual-splash__glow {
+    position: absolute;
+    width: min(70vw, 480px);
+    height: min(70vw, 480px);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212, 168, 67, 0.45) 0%, rgba(232, 149, 46, 0.15) 40%, transparent 70%);
+    filter: blur(40px);
+    animation: splashGlowPulse 4s ease-in-out infinite;
+    opacity: 0;
+}
+
+.spiritual-splash.is-active .spiritual-splash__glow {
+    animation: splashGlowFadeIn 1.2s ease forwards, splashGlowPulse 4s ease-in-out 1.2s infinite;
+}
+
+@keyframes splashGlowFadeIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes splashGlowPulse {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
+}
+
+.spiritual-splash__particles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.spiritual-splash__particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(212, 168, 67, 0.6);
+    box-shadow: 0 0 8px rgba(212, 168, 67, 0.4);
+    animation: particleFloat 6s ease-in-out infinite;
+}
+
+@keyframes particleFloat {
+    0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+    50% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
+}
+
+.spiritual-splash__content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.5rem;
+    max-width: 520px;
+}
+
+/* KrishnaHero */
+.krishna-hero {
+    position: relative;
+    width: min(280px, 55vw);
+    margin-bottom: 1.75rem;
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+}
+
+.spiritual-splash.is-active .krishna-hero {
+    animation: krishnaReveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+}
+
+@keyframes krishnaReveal {
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.krishna-hero__frame {
+    position: relative;
+    border-radius: 50%;
+    padding: 5px;
+    background: linear-gradient(145deg, #d4a843, #e8952e, #c47a2a);
+    box-shadow:
+        0 0 0 1px rgba(212, 168, 67, 0.3),
+        0 20px 60px rgba(139, 90, 43, 0.2),
+        0 0 80px rgba(212, 168, 67, 0.15);
+    animation: krishnaParallax 5s ease-in-out infinite;
+}
+
+@keyframes krishnaParallax {
+    0%, 100% { transform: scale(1) translateY(0); }
+    50% { transform: scale(1.02) translateY(-4px); }
+}
+
+.krishna-hero__image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    object-position: center top;
+    border-radius: 50%;
+    background: #faf6ef;
+}
+
+.krishna-hero__halo {
+    position: absolute;
+    inset: -12%;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 168, 67, 0.2);
+    animation: haloRotate 20s linear infinite;
+}
+
+@keyframes haloRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Splash text sequence */
+.splash-text {
+    opacity: 0;
+    transform: translateY(16px);
+}
+
+.spiritual-splash.is-active .splash-text--mantra {
+    animation: splashTextIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 1.6s forwards;
+}
+
+.spiritual-splash.is-active .splash-text--welcome {
+    animation: splashTextIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 2.1s forwards;
+}
+
+.spiritual-splash.is-active .splash-text--subtitle {
+    animation: splashTextIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 2.5s forwards;
+}
+
+@keyframes splashTextIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.splash-text--mantra {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 2.75rem);
+    font-weight: 400;
+    color: var(--saffron-deep);
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 20px rgba(212, 168, 67, 0.25);
+}
+
+.splash-text--welcome {
+    font-family: var(--font-display);
+    font-size: clamp(1.1rem, 3.5vw, 1.45rem);
+    color: var(--text-main);
+    font-weight: 400;
+    margin-bottom: 0.35rem;
+}
+
+.splash-text--subtitle {
+    font-size: clamp(0.85rem, 2.5vw, 0.95rem);
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+.spiritual-splash__skip {
+    position: absolute;
+    bottom: 1.75rem;
+    right: 1.75rem;
+    z-index: 10;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    transition: color 0.2s ease, background 0.2s ease;
+    font-family: inherit;
+}
+
+.spiritual-splash__skip:hover {
+    color: var(--saffron);
+    background: rgba(232, 149, 46, 0.08);
+}
+
+/* ================================================================== */
+/* FlowerPetalAnimation                                               */
+/* ================================================================== */
+
+.flower-petal-container {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.flower-petal {
+    position: absolute;
+    top: -40px;
+    will-change: transform, opacity;
+    pointer-events: none;
+}
+
+.flower-petal--marigold {
+    width: 14px;
+    height: 14px;
+    border-radius: 50% 50% 50% 20%;
+    background: radial-gradient(circle at 30% 30%, #ffd54f, #e8952e);
+}
+
+.flower-petal--rose {
+    width: 12px;
+    height: 16px;
+    border-radius: 50% 50% 40% 40%;
+    background: radial-gradient(ellipse at 50% 30%, #f8bbd9, #e57373);
+}
+
+.flower-petal--lotus {
+    width: 16px;
+    height: 10px;
+    border-radius: 50% 50% 0 0;
+    background: linear-gradient(180deg, #fce4ec, #f48fb1);
+}
+
+.flower-petal--white {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff, #f5f0e8);
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+.flower-petal--blurred {
+    filter: blur(1.5px);
+}
+
+.flower-petal--near {
+    filter: blur(0);
+    z-index: 2;
+}
+
+/* Dashboard ambient petals (very subtle) */
+.dashboard-petals {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+    opacity: 0.35;
+}
+
+/* ================================================================== */
+/* Spiritual decorative UI elements                                   */
+/* ================================================================== */
+
+.gold-ornament {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1rem 0;
+    color: var(--gold);
+    opacity: 0.5;
+}
+
+.gold-ornament::before,
+.gold-ornament::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+.lotus-accent {
+    display: inline-block;
+    font-size: 0.75rem;
+    opacity: 0.4;
+}
+
+.card--spiritual {
+    position: relative;
+    overflow: hidden;
+}
+
+.card--spiritual::after {
+    content: '🪷';
+    position: absolute;
+    bottom: -8px;
+    right: -4px;
+    font-size: 3rem;
+    opacity: 0.04;
+    pointer-events: none;
+}
+
+.nav-brand__subtitle {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: block;
+    line-height: 1.2;
+}
+
+/* Button ripple */
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.35) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.btn-primary:active::after {
+    opacity: 1;
+}
+
+/* Card entrance stagger */
+.card--animate-in {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.card--animate-in.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow var(--transition-smooth);
+}
+
+/* ================================================================== */
+/* Responsive & Reduced Motion                                        */
+/* ================================================================== */
+
+@media (max-width: 480px) {
+    .krishna-hero {
+        width: min(220px, 62vw);
+    }
+
+    .spiritual-splash__skip {
+        bottom: 1rem;
+        right: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spiritual-splash__glow,
+    .krishna-hero__frame,
+    .krishna-hero__halo,
+    .spiritual-splash__particle {
+        animation: none !important;
+    }
+
+    .krishna-hero,
+    .splash-text {
+        opacity: 1 !important;
+        transform: none !important;
+        animation: none !important;
+    }
+
+    .spiritual-splash.is-active .krishna-hero,
+    .spiritual-splash.is-active .splash-text--mantra,
+    .spiritual-splash.is-active .splash-text--welcome,
+    .spiritual-splash.is-active .splash-text--subtitle {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+
+    #app-shell.app-shell--revealed {
+        transition: opacity 0.3s ease !important;
+    }
+}

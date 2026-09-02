@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Activity Log</h1>
+        <p class="page-subtitle">A read-only record of every Admin action across the system, most recent first.</p>
+    </div>
+</div>
+
+<div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if entries %}
+                {% for e in entries %}
+                <tr>
+                    <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">{{ e.created_at }}</td>
+                    <td style="font-weight: 500;">{{ e.user_name or 'Unknown' }} <span style="color: var(--text-muted); font-size: 0.75rem;">({{ e.user_role or '-' }})</span></td>
+                    <td>
+                        <span class="stat-badge {% if e.action == 'delete' or e.action == 'deactivate' %}negative{% elif e.action == 'create' %}positive{% else %}neutral{% endif %}">
+                            {{ e.action|capitalize }}
+                        </span>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">{{ e.entity_type|capitalize }}{% if e.entity_id %} #{{ e.entity_id }}{% endif %}</td>
+                    <td>{{ e.details or '-' }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 3rem;">No activity recorded yet.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

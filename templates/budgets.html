@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Budgets — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Department Budgets</h1>
+        <p class="page-subtitle">Set monthly spending limits per department to keep expenses on track.</p>
+    </div>
+    {% if g.user['role'] == 'admin' %}
+    <button onclick="openModal('addBudgetModal')" class="btn btn-primary">
+        + Set Budget Limit
+    </button>
+    {% endif %}
+</div>
+
+<div class="grid-2">
+    {% for b in budgets %}
+    {% set limit = b.monthly_limit or 0 %}
+    {% set spent = b.spent or 0 %}
+    {% set pct = (spent / limit * 100)|round(1) if limit > 0 else 0 %}
+
+    <div class="card card--spiritual card--animate-in">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.5rem;">{{ b.icon }}</span>
+                <div>
+                    <h3 class="card-title">{{ b.name }}</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        Spent ₹{{ "{:,.2f}".format(spent) }} of ₹{{ "{:,.2f}".format(limit) }} limit
+                    </div>
+                </div>
+            </div>
+
+            {% if limit > 0 %}
+                {% if pct >= 100 %}
+                    <span class="stat-badge negative">Over Limit ({{ pct }}%)</span>
+                {% elif pct >= 80 %}
+                    <span class="stat-badge negative">Warning ({{ pct }}%)</span>
+                {% else %}
+                    <span class="stat-badge positive">On Track ({{ pct }}%)</span>
+                {% endif %}
+            {% else %}
+                <span class="stat-badge neutral">No Limit Set</span>
+            {% endif %}
+        </div>
+
+        {% if limit > 0 %}
+        <div style="width: 100%; height: 8px; background: var(--bg-subtle); border-radius: 4px; overflow: hidden; margin: 1rem 0;">
+            <div style="width: {{ [pct, 100]|min }}%; height: 100%; background: {% if pct >= 90 %}var(--rose){% elif pct >= 75 %}var(--amber){% else %}var(--emerald){% endif %}; border-radius: 4px; transition: width 0.4s ease;"></div>
+        </div>
+        {% endif %}
+
+        {% if g.user['role'] == 'admin' and b.budget_id %}
+        <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+            <form method="POST" action="{{ url_for('delete_budget', id=b.budget_id) }}" onsubmit="return confirm('Remove budget limit for {{ b.name }}?');">
+                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; color: var(--rose);">Remove Limit</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align: center; color: var(--text-muted); padding: 3rem;">No departments yet.</div>
+    {% endfor %}
+</div>
+
+{% if g.user['role'] == 'admin' %}
+<!-- Add Budget Modal -->
+<div class="modal-overlay" id="addBudgetModal">
+    <div class="modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Set Department Budget</h3>
+            <button onclick="closeModal('addBudgetModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('add_budget') }}">
+            <div class="form-group">
+                <label class="form-label">Department</label>
+                <select name="department_id" class="form-select" required>
+                    {% for d in departments %}
+                        <option value="{{ d.id }}">{{ d.icon }} {{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Monthly Limit (₹)</label>
+                <input type="number" step="100" name="monthly_limit" class="form-input" placeholder="50000" required autofocus>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Budget Limit</button>
+                <button type="button" onclick="closeModal('addBudgetModal')" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Departments — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Departments</h1>
+        <p class="page-subtitle">Organizational categories that own budgets and expenses across the temple.</p>
+    </div>
+    {% if g.user['role'] == 'admin' %}
+    <button onclick="openModal('addDepartmentModal')" class="btn btn-primary">
+        + New Department
+    </button>
+    {% endif %}
+</div>
+
+<div class="grid-2">
+    {% for d in departments %}
+    {% set limit = d.monthly_limit or 0 %}
+    {% set spent = d.spent or 0 %}
+    {% set pct = (spent / limit * 100)|round(1) if limit > 0 else 0 %}
+
+    <div class="card card--spiritual card--animate-in" style="{% if not d.is_active %}opacity: 0.6;{% endif %}">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.5rem;">{{ d.icon }}</span>
+                <div>
+                    <h3 class="card-title">{{ d.name }}</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">{{ d.expense_count }} expense record(s)</div>
+                </div>
+            </div>
+            {% if not d.is_active %}
+                <span class="stat-badge neutral">Inactive</span>
+            {% elif limit > 0 %}
+                {% if pct >= 100 %}
+                    <span class="stat-badge negative">Over Budget ({{ pct }}%)</span>
+                {% elif pct >= 80 %}
+                    <span class="stat-badge negative">Warning ({{ pct }}%)</span>
+                {% else %}
+                    <span class="stat-badge positive">On Track ({{ pct }}%)</span>
+                {% endif %}
+            {% else %}
+                <span class="stat-badge neutral">No Budget Set</span>
+            {% endif %}
+        </div>
+
+        {% if d.description %}
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">{{ d.description }}</p>
+        {% endif %}
+
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            {% if d.manager_name %}
+                👤 {{ d.manager_name }} ({{ d.manager_email }}){% if not d.manager_is_active %} — inactive{% endif %}
+            {% else %}
+                👤 No manager assigned
+            {% endif %}
+        </div>
+
+        {% if limit > 0 %}
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+            Spent ₹{{ "{:,.2f}".format(spent) }} of ₹{{ "{:,.2f}".format(limit) }} this month
+        </div>
+        <div style="width: 100%; height: 8px; background: var(--bg-subtle); border-radius: 4px; overflow: hidden; margin-bottom: 0.75rem;">
+            <div style="width: {{ [pct, 100]|min }}%; height: 100%; background: {% if pct >= 90 %}var(--rose){% elif pct >= 75 %}var(--amber){% else %}var(--emerald){% endif %}; border-radius: 4px; transition: width 0.4s ease;"></div>
+        </div>
+        {% endif %}
+
+        {% if g.user['role'] == 'admin' %}
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+            <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;"
+                onclick="openEditDepartment({{ d.id }}, {{ d.name|tojson }}, {{ (d.description or '')|tojson }}, {{ d.icon|tojson }}, {{ d.color|tojson }}, {{ (d.manager_id or '')|tojson }})">
+                Edit
+            </button>
+            <form method="POST" action="{{ url_for('toggle_department', id=d.id) }}" style="display: inline;">
+                <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+                    {{ 'Reactivate' if not d.is_active else 'Deactivate' }}
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('delete_department', id=d.id) }}" style="display: inline;" onsubmit="return confirm('Delete department {{ d.name }}? If it has expense history it will be deactivated instead.');">
+                <button type="submit" class="btn btn-danger" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Delete</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align: center; color: var(--text-muted); padding: 3rem;">No departments yet.</div>
+    {% endfor %}
+</div>
+
+{% if g.user['role'] == 'admin' %}
+<!-- Add Department Modal -->
+<div class="modal-overlay" id="addDepartmentModal">
+    <div class="modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">New Department</h3>
+            <button onclick="closeModal('addDepartmentModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('add_department') }}">
+            <div class="form-group">
+                <label class="form-label">Department Name</label>
+                <input type="text" name="name" class="form-input" placeholder="e.g. Temple Construction" required autofocus>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description / Info</label>
+                <textarea name="description" class="form-input" rows="2" placeholder="What this department covers"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Allocated Budget (₹, optional)</label>
+                <input type="number" step="100" name="allocated_budget" class="form-input" placeholder="e.g. 120000">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Monthly cap enforced against the Incharge — leave blank for no limit.</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Incharge / Manager</label>
+                <div style="display: flex; gap: 1.5rem; margin-bottom: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.4rem; font-weight: 400; font-size: 0.9rem;">
+                        <input type="radio" name="manager_mode" value="new" checked onchange="toggleManagerMode('add')" style="width: auto;">
+                        Create new Incharge account
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.4rem; font-weight: 400; font-size: 0.9rem;">
+                        <input type="radio" name="manager_mode" value="existing" onchange="toggleManagerMode('add')" style="width: auto;">
+                        Assign existing manager
+                    </label>
+                </div>
+            </div>
+
+            <div id="addNewInchargeFields">
+                <div class="form-group">
+                    <label class="form-label">Incharge Name</label>
+                    <input type="text" name="incharge_name" class="form-input" placeholder="Full name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Incharge Email</label>
+                    <input type="email" name="incharge_email" class="form-input" placeholder="incharge@example.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Default Password</label>
+                    <input type="password" name="incharge_password" class="form-input" minlength="6" placeholder="At least 6 characters">
+                </div>
+            </div>
+
+            <div id="addExistingManagerField" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Assigned Manager</label>
+                    <select name="manager_id" class="form-select">
+                        <option value="">— No manager assigned —</option>
+                        {% for m in managers_list %}
+                            <option value="{{ m.id }}">{{ m.name }} ({{ m.email }}){% if not m.is_active %} — inactive{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label">Icon (emoji)</label>
+                    <input type="text" name="icon" class="form-input" value="🏛️" maxlength="4">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label">Color</label>
+                    <input type="color" name="color" class="form-input" value="#6366f1" style="padding: 0.25rem; height: 42px;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Create Department</button>
+                <button type="button" onclick="closeModal('addDepartmentModal')" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Department Modal -->
+<div class="modal-overlay" id="editDepartmentModal">
+    <div class="modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Edit Department</h3>
+            <button onclick="closeModal('editDepartmentModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <form method="POST" id="editDepartmentForm" action="">
+            <div class="form-group">
+                <label class="form-label">Department Name</label>
+                <input type="text" name="name" id="editDeptName" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" id="editDeptDescription" class="form-input" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Assigned Manager (optional)</label>
+                <select name="manager_id" id="editDeptManager" class="form-select">
+                    <option value="">— No manager assigned —</option>
+                    {% for m in managers_list %}
+                        <option value="{{ m.id }}">{{ m.name }} ({{ m.email }}){% if not m.is_active %} — inactive{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label">Icon (emoji)</label>
+                    <input type="text" name="icon" id="editDeptIcon" class="form-input" maxlength="4">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label">Color</label>
+                    <input type="color" name="color" id="editDeptColor" class="form-input" style="padding: 0.25rem; height: 42px;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Changes</button>
+                <button type="button" onclick="closeModal('editDepartmentModal')" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditDepartment(id, name, description, icon, color, managerId) {
+    document.getElementById('editDepartmentForm').action = '/departments/' + id + '/edit';
+    document.getElementById('editDeptName').value = name;
+    document.getElementById('editDeptDescription').value = description;
+    document.getElementById('editDeptIcon').value = icon;
+    document.getElementById('editDeptColor').value = color;
+    document.getElementById('editDeptManager').value = managerId || '';
+    openModal('editDepartmentModal');
+}
+
+function toggleManagerMode(prefix) {
+    var mode = document.querySelector('input[name="manager_mode"]:checked').value;
+    document.getElementById(prefix + 'NewInchargeFields').style.display = mode === 'new' ? '' : 'none';
+    document.getElementById(prefix + 'ExistingManagerField').style.display = mode === 'existing' ? '' : 'none';
+}
+</script>
+{% endif %}
+
+{% endblock %}

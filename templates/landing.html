@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}ISKCON Shirpur — Mindful Expense Management{% endblock %}
+
+{% block content %}
+
+<section style="text-align: center; max-width: 720px; margin: 3rem auto 4rem; padding: 2.5rem 2rem; background: rgba(255, 252, 247, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(45, 27, 14, 0.25);">
+    <div class="krishna-hero" style="margin: 0 auto 1.5rem; opacity: 1; transform: none;">
+        <div class="krishna-hero__halo" aria-hidden="true"></div>
+        <div class="krishna-hero__frame">
+            <img
+                src="{{ url_for('static', filename='images/WhatsApp Image 2026-08-27 at 3.09.57 PM.jpeg') }}"
+                alt="Shree Krishna"
+                class="krishna-hero__image"
+                width="280"
+                height="373"
+                loading="eager"
+            >
+        </div>
+    </div>
+
+    <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.8rem; background: var(--saffron-light); color: var(--saffron-deep); border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1.5rem;">
+        🪷 Manage your finances with mindfulness
+    </div>
+
+    <h1 style="font-family: var(--font-display); font-size: 3rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--text-main); margin-bottom: 0.5rem;">
+        हरे कृष्ण
+    </h1>
+
+    <h2 style="font-family: var(--font-display); font-size: 1.75rem; font-weight: 600; color: var(--text-main); margin-bottom: 1.25rem;">
+        Welcome to <span style="background: linear-gradient(135deg, #e8952e, #d4a843); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">ISKCON Shirpur</span>
+    </h2>
+
+    <p style="font-size: 1.1rem; color: var(--text-muted); margin-bottom: 2rem; line-height: 1.6;">
+        Track department expenses, budgets, and alerts across the temple with mindful, transparent financial management.
+    </p>
+
+    <div style="display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+        <a href="{{ url_for('login') }}" class="btn btn-primary" style="padding: 0.75rem 1.75rem; font-size: 1rem;">
+            Sign In to Dashboard
+        </a>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 1rem;">
+        Account access is provisioned by your temple administrator.
+    </p>
+</section>
+
+<div class="gold-ornament"><span class="lotus-accent">🪷</span></div>
+
+<section style="margin-bottom: 4rem;">
+    <h2 style="font-family: var(--font-display); text-align: center; font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 2rem; color: var(--text-main); text-shadow: 0 1px 24px var(--bg-card), 0 1px 3px var(--bg-card);">
+        Built for Mindful Financial Management
+    </h2>
+
+    <div class="grid-3">
+        <div class="card card--spiritual card--animate-in">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">🏛️</div>
+            <h3 class="card-title" style="margin-bottom: 0.5rem;">Dynamic Departments</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Organize spending by department — Construction, Prasadam, Festivals, Seva, and Administration — each with its own budget.
+            </p>
+        </div>
+        <div class="card card--spiritual card--animate-in">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">🔒</div>
+            <h3 class="card-title" style="margin-bottom: 0.5rem;">Role-Based Access</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Admins manage departments, expenses, and alerts. Auditors get complete, read-only visibility and reporting tools.
+            </p>
+        </div>
+        <div class="card card--spiritual card--animate-in">
+            <div style="font-size: 2rem; margin-bottom: 0.75rem;">📄</div>
+            <h3 class="card-title" style="margin-bottom: 0.5rem;">Reports & Receipts</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Attach receipts to every expense and export filtered PDF or CSV statements by department and date range.
+            </p>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

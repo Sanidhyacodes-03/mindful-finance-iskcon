@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Department Expenses</h1>
+        <p class="page-subtitle">Track, filter, and manage all recorded temple expenditures.</p>
+    </div>
+    {% if g.user['role'] in ('admin', 'manager') %}
+    <div style="display: flex; gap: 0.5rem;">
+        <button onclick="openModal('addExpenseModal')" class="btn btn-primary">
+            + Log Expense
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Filters Card -->
+<div class="card card--spiritual card--animate-in" style="margin-bottom: 2rem;">
+    <form method="GET" action="{{ url_for('expenses') }}" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 2; min-width: 200px;">
+            <label class="form-label">Search Description</label>
+            <input type="text" name="q" class="form-input" placeholder="Search description, department..." value="{{ search_q }}">
+        </div>
+
+        <div style="flex: 1; min-width: 160px;">
+            <label class="form-label">Department</label>
+            <select name="department" class="form-select">
+                <option value="">All Departments</option>
+                {% for d in departments %}
+                    <option value="{{ d.id }}" {% if selected_department == (d.id|string) %}selected{% endif %}>
+                        {{ d.icon }} {{ d.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="flex: 1; min-width: 140px;">
+            <label class="form-label">From Date</label>
+            <input type="date" name="from" class="form-input" value="{{ date_from }}">
+        </div>
+
+        <div style="flex: 1; min-width: 140px;">
+            <label class="form-label">To Date</label>
+            <input type="date" name="to" class="form-input" value="{{ date_to }}">
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-secondary">Filter</button>
+            <a href="{{ url_for('expenses') }}" class="btn btn-secondary" style="color: var(--text-muted);">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Expenses Table -->
+<div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Department</th>
+                <th>Description</th>
+                <th>Payment Method</th>
+                <th>Added By</th>
+                <th>Receipt</th>
+                <th style="text-align: right;">Amount</th>
+                {% if g.user['role'] in ('admin', 'manager') %}<th style="text-align: center;">Actions</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% if expenses %}
+                {% for e in expenses %}
+                <tr>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">{{ e.date }}</td>
+                    <td>
+                        <span class="category-chip" style="background: {{ e.department_color }}15; color: {{ e.department_color }}; border: 1px solid {{ e.department_color }}30;">
+                            {{ e.department_icon }} {{ e.department_name }}
+                        </span>
+                    </td>
+                    <td style="font-weight: 500;">{{ e.description }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">{{ e.payment_method }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">{{ e.added_by_name or '-' }}</td>
+                    <td>
+                        {% if e.receipt_path %}
+                            <a href="{{ url_for('view_receipt', filename=e.receipt_path) }}" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">View</a>
+                        {% else %}
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="amount-col" style="text-align: right;">₹{{ "{:,.2f}".format(e.amount) }}</td>
+                    {% if g.user['role'] in ('admin', 'manager') %}
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 0.4rem; justify-content: center;">
+                            <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                onclick="openEditExpense({{ e.id }}, {{ e.department_id }}, {{ e.amount }}, {{ e.description|tojson }}, {{ e.date|tojson }}, {{ e.payment_method|tojson }})">
+                                Edit
+                            </button>
+                            <form method="POST" action="{{ url_for('delete_expense', id=e.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this expense?');">
+                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                        No expense records found matching your filters.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if g.user['role'] in ('admin', 'manager') %}
+<!-- Add Expense Modal -->
+<div class="modal-overlay" id="addExpenseModal">
+    <div class="modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Log New Expense</h3>
+            <button onclick="closeModal('addExpenseModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('add_expense') }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" step="0.01" name="amount" class="form-input" placeholder="4500.00" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" name="description" class="form-input" placeholder="Cement purchase / Grocery supplies" required>
+            </div>
+
+            {% if g.user['role'] == 'manager' %}
+                {% if departments %}
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input type="text" class="form-input" value="{{ departments[0].icon }} {{ departments[0].name }}" disabled style="background: var(--bg-subtle);">
+                        <input type="hidden" name="department_id" value="{{ departments[0].id }}">
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Automatically assigned to your department.</span>
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <select name="department_id" class="form-select" required>
+                        {% for d in departments %}
+                            <option value="{{ d.id }}">{{ d.icon }} {{ d.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" class="form-input" value="{{ today_date }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Payment Method</label>
+                <select name="payment_method" class="form-select">
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Cheque">Cheque</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Receipt (PDF, PNG, or JPG, max 5MB)</label>
+                <input type="file" name="receipt" class="form-input" accept=".pdf,.png,.jpg,.jpeg">
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Expense</button>
+                <button type="button" onclick="closeModal('addExpenseModal')" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Expense Modal -->
+<div class="modal-overlay" id="editExpenseModal">
+    <div class="modal-content">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Edit Expense</h3>
+            <button onclick="closeModal('editExpenseModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <form method="POST" id="editExpenseForm" action="" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" step="0.01" name="amount" id="editExpAmount" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" name="description" id="editExpDescription" class="form-input" required>
+            </div>
+
+            {% if g.user['role'] == 'manager' %}
+                <input type="hidden" name="department_id" id="editExpDepartment">
+            {% else %}
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <select name="department_id" id="editExpDepartment" class="form-select" required>
+                        {% for d in departments %}
+                            <option value="{{ d.id }}">{{ d.icon }} {{ d.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" name="date" id="editExpDate" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Payment Method</label>
+                <select name="payment_method" id="editExpPaymentMethod" class="form-select">
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Cheque">Cheque</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Replace Receipt (optional)</label>
+                <input type="file" name="receipt" class="form-input" accept=".pdf,.png,.jpg,.jpeg">
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Changes</button>
+                <button type="button" onclick="closeModal('editExpenseModal')" class="btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditExpense(id, departmentId, amount, description, date, paymentMethod) {
+    document.getElementById('editExpenseForm').action = '/expenses/' + id + '/edit';
+    document.getElementById('editExpAmount').value = amount;
+    document.getElementById('editExpDescription').value = description;
+    document.getElementById('editExpDepartment').value = departmentId;
+    document.getElementById('editExpDate').value = date;
+    document.getElementById('editExpPaymentMethod').value = paymentMethod;
+    openModal('editExpenseModal');
+}
+</script>
+{% endif %}
+
+{% endblock %}
