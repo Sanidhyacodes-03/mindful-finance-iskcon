@@ -596,6 +596,8 @@ a {
     padding: 2rem;
     width: 100%;
     max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: var(--shadow-lg);
     transform: translateY(16px) scale(0.98);
     transition: transform var(--transition-smooth);
