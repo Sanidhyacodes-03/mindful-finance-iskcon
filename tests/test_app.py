@@ -132,17 +132,31 @@ def test_manager_scoped_to_own_department(client):
     cursor = db.cursor()
     cursor.execute("SELECT id, name FROM departments WHERE manager_id = (SELECT id FROM users WHERE email = ?)", (MANAGER_EMAIL,))
     own_dept = cursor.fetchone()
-    cursor.execute("SELECT id FROM departments WHERE id != ? LIMIT 1", (own_dept['id'],))
-    other_dept_id = cursor.fetchone()['id']
+    cursor.execute("SELECT id, name FROM departments WHERE id != ? LIMIT 1", (own_dept['id'],))
+    other_dept_row = cursor.fetchone()
+    other_dept_id = other_dept_row['id']
+    other_dept_id_name = other_dept_row['name']
     db.close()
 
     login(client, MANAGER_EMAIL, MANAGER_PASSWORD)
 
     # Blocked from org-wide pages entirely.
-    for path in ('/departments', '/users', '/reports', '/activity-log'):
+    for path in ('/departments', '/users', '/activity-log'):
         rv = client.get(path, follow_redirects=True)
         assert rv.status_code == 200
         assert b"scoped to your assigned department" in rv.data
+
+    # Reports IS accessible to managers, but must always be forced to their own
+    # department — a hand-edited ?department=<other id> must be silently overridden.
+    rv_page = client.get('/reports')
+    assert rv_page.status_code == 200
+    rv_pdf = client.get(f'/reports/export/pdf?start_date=2026-01-01&end_date=2026-12-31&department={other_dept_id}')
+    assert rv_pdf.status_code == 200
+    assert rv_pdf.mimetype == "application/pdf"
+    rv_csv = client.get(f'/reports/export/csv?start_date=2026-01-01&end_date=2026-12-31&department={other_dept_id}')
+    assert rv_csv.status_code == 200
+    assert other_dept_id_name.encode() not in rv_csv.data
+    assert own_dept['name'].encode() in rv_csv.data
 
     # Can add an expense to their own department.
     rv = client.post('/expenses/add', data=dict(

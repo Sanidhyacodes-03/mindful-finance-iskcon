@@ -91,6 +91,7 @@ MANAGER_ALLOWED_ENDPOINTS = {
     'static', 'landing', 'terms', 'privacy',
     'dashboard', 'expenses', 'add_expense', 'edit_expense', 'delete_expense',
     'view_receipt', 'budgets', 'alerts', 'profile', 'logout',
+    'reports', 'export_report_pdf', 'export_report_csv',
 }
 
 
@@ -152,6 +153,18 @@ def enforce_manager_scope():
             return redirect(url_for('dashboard'))
 
 
+LOGO_FILENAMES = ["logo.png", "logo.jpg", "logo.jpeg", "logo.svg"]
+
+
+def _find_logo_url():
+    """Checked fresh per-request (cheap) so dropping the file in static/images/
+    makes the logo appear everywhere immediately, no restart needed."""
+    for name in LOGO_FILENAMES:
+        if os.path.exists(os.path.join(app.root_path, "static", "images", name)):
+            return url_for('static', filename=f'images/{name}')
+    return None
+
+
 @app.context_processor
 def inject_globals():
     show_carousel = request.endpoint in CAROUSEL_ENDPOINTS
@@ -160,6 +173,7 @@ def inject_globals():
         'datetime': datetime,
         'show_bg_carousel': show_carousel,
         'background_images': [url_for('static', filename=p) for p in BACKGROUND_IMAGE_PATHS] if show_carousel else [],
+        'logo_url': _find_logo_url(),
     }
 
 
@@ -1201,6 +1215,18 @@ def export_report_pdf():
     end_date = request.args.get("end_date", now.strftime("%Y-%m-%d"))
     department_id = request.args.get("department") or None
 
+    # Managers can never request another department's report — the backend assigns
+    # their own department_id, ignoring/overriding whatever the query string says.
+    db = get_db()
+    cursor = db.cursor()
+    dept_ids = _manager_department_ids(cursor, g.user)
+    db.close()
+    if dept_ids is not None:
+        if not dept_ids:
+            flash("No department is assigned to your account. Contact an administrator.", "danger")
+            return redirect(url_for('dashboard'))
+        department_id = dept_ids[0]
+
     pdf_bytes = ReportService.generate_department_pdf(department_id, start_date, end_date, g.user['name'])
 
     filename = f"iskcon_shirpur_report_{start_date}_to_{end_date}.pdf"
@@ -1218,6 +1244,17 @@ def export_report_csv():
     start_date = request.args.get("start_date", now.replace(day=1).strftime("%Y-%m-%d"))
     end_date = request.args.get("end_date", now.strftime("%Y-%m-%d"))
     department_id = request.args.get("department") or None
+
+    # Same override as the PDF export — a Manager's own department, always.
+    db = get_db()
+    cursor = db.cursor()
+    dept_ids = _manager_department_ids(cursor, g.user)
+    db.close()
+    if dept_ids is not None:
+        if not dept_ids:
+            flash("No department is assigned to your account. Contact an administrator.", "danger")
+            return redirect(url_for('dashboard'))
+        department_id = dept_ids[0]
 
     csv_text = ReportService.generate_csv(department_id, start_date, end_date)
 

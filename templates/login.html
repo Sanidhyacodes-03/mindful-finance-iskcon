@@ -7,7 +7,11 @@
 <div style="max-width: 440px; margin: 3rem auto;">
     <div class="card">
         <div style="text-align: center; margin-bottom: 1.5rem;">
-            <div class="brand-icon" style="margin: 0 auto 0.75rem; width: 42px; height: 42px; font-size: 1.2rem;">🪷</div>
+            {% if logo_url %}
+                <img src="{{ logo_url }}" class="brand-icon brand-icon--logo" style="margin: 0 auto 0.75rem; width: 56px; height: 56px;" alt="ISKCON Shirpur">
+            {% else %}
+                <div class="brand-icon" style="margin: 0 auto 0.75rem; width: 42px; height: 42px; font-size: 1.2rem;">🪷</div>
+            {% endif %}
             <h1 style="font-family: var(--font-display); font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em;">Welcome back</h1>
             <p style="color: var(--text-muted); font-size: 0.9rem;">Sign in to ISKCON Shirpur Mindful Finance</p>
         </div>
@@ -21,15 +25,15 @@
         <form method="POST" action="{{ url_for('login') }}">
             <div class="form-group">
                 <label for="email" class="form-label">Email address</label>
-                <input type="email" id="email" name="email" class="form-input" placeholder="nitish@example.com" value="demo@spendly.io" required autofocus>
+                <input type="email" id="email" name="email" class="form-input" placeholder="nitish@example.com" required autofocus>
             </div>
-            
+
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
                     <label for="password" class="form-label" style="margin-bottom: 0;">Password</label>
                     <a href="{{ url_for('forgot_password') }}" style="font-size: 0.8rem; color: var(--primary);">Forgot password?</a>
                 </div>
-                <input type="password" id="password" name="password" class="form-input" placeholder="Your password" value="password123" required>
+                <input type="password" id="password" name="password" class="form-input" placeholder="Your password" required>
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">

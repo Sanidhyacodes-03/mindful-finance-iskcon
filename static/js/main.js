@@ -1,6 +1,28 @@
 // ISKCON Shirpur — Motion & Interactive Client Script
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. Mobile nav toggle
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    if (navToggle && navLinks) {
+        navToggle.addEventListener('click', () => {
+            const isOpen = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        navLinks.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                navLinks.classList.remove('open');
+                navToggle.setAttribute('aria-expanded', 'false');
+            });
+        });
+        document.addEventListener('click', (e) => {
+            if (!navLinks.classList.contains('open')) return;
+            if (navLinks.contains(e.target) || navToggle.contains(e.target)) return;
+            navLinks.classList.remove('open');
+            navToggle.setAttribute('aria-expanded', 'false');
+        });
+    }
+
     // 1. Auto dismiss alerts after 5s
     setTimeout(() => {
         const alerts = document.querySelectorAll('.alert');

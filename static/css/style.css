@@ -135,10 +135,75 @@ a {
     transform: rotate(12deg) scale(1.05);
 }
 
+.brand-icon--logo {
+    background: none;
+    box-shadow: none;
+    object-fit: contain;
+}
+
 .nav-links {
     display: flex;
     align-items: center;
     gap: 1.25rem;
+}
+
+.nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--text-main);
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius-sm);
+}
+
+.nav-toggle:hover {
+    background: var(--bg-subtle);
+}
+
+@media (max-width: 1024px) {
+    .nav-toggle {
+        display: block;
+    }
+
+    .nav-links {
+        position: absolute;
+        top: 64px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height var(--transition-smooth);
+    }
+
+    .nav-links.open {
+        max-height: calc(100vh - 64px);
+        overflow-y: auto;
+    }
+
+    .nav-links .nav-link,
+    .nav-links .nav-cta,
+    .nav-links .notification-badge {
+        width: 100%;
+        border-radius: 0;
+        padding: 0.9rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        justify-content: flex-start;
+    }
+
+    .nav-links .unread-count {
+        position: static;
+        margin-left: 0.6rem;
+        border: none;
+    }
 }
 
 .nav-link {
@@ -580,6 +645,7 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 1rem;
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-smooth);

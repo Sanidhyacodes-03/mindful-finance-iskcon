@@ -90,14 +90,22 @@
         <nav class="navbar">
             <div class="nav-inner">
                 <a href="{{ url_for('landing') }}" class="nav-brand">
-                    <span class="brand-icon">🪷</span>
+                    {% if logo_url %}
+                        <img src="{{ logo_url }}" class="brand-icon brand-icon--logo" alt="ISKCON Shirpur">
+                    {% else %}
+                        <span class="brand-icon">🪷</span>
+                    {% endif %}
                     <span>
                         <span class="brand-name">ISKCON Shirpur</span>
                         <span class="nav-brand__subtitle">Mindful Finance</span>
                     </span>
                 </a>
 
-                <div class="nav-links">
+                {% if g.user %}
+                <button type="button" id="navToggle" class="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks">☰</button>
+                {% endif %}
+
+                <div class="nav-links" id="navLinks">
                     {% if g.user %}
                         <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
                         {% if g.user['role'] != 'manager' %}
@@ -107,8 +115,8 @@
                         <a href="{{ url_for('budgets') }}" class="nav-link {% if request.endpoint == 'budgets' %}active{% endif %}">Budgets</a>
                         {% if g.user['role'] != 'manager' %}
                             <a href="{{ url_for('activity_log') }}" class="nav-link {% if request.endpoint == 'activity_log' %}active{% endif %}">Activity Log</a>
-                            <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
                         {% endif %}
+                        <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
                         {% if g.user['role'] == 'admin' %}
                             <a href="{{ url_for('manage_users') }}" class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}">Manage Users</a>
                         {% endif %}
@@ -148,7 +156,11 @@
         <footer class="footer">
             <div class="footer-inner">
                 <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: var(--text-main);">
-                    <span class="brand-icon" style="width: 24px; height: 24px; font-size: 0.8rem;">🪷</span>
+                    {% if logo_url %}
+                        <img src="{{ logo_url }}" class="brand-icon brand-icon--logo" style="width: 24px; height: 24px;" alt="ISKCON Shirpur">
+                    {% else %}
+                        <span class="brand-icon" style="width: 24px; height: 24px; font-size: 0.8rem;">🪷</span>
+                    {% endif %}
                     <span>ISKCON Shirpur Finance</span>
                 </div>
                 <p>Mindful Expense Management — हरे कृष्ण</p>

@@ -8,16 +8,32 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, Image as RLImage
 )
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 from database.db import get_db
 
-FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "fonts")
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+FONT_DIR = os.path.join(_STATIC_DIR, "fonts")
 FONT_REGULAR = "DejaVuSans"
 FONT_BOLD = "DejaVuSans-Bold"
+
+# Drop the official logo at static/images/logo.png (or .jpg) to have it appear here
+# automatically — no code change needed. Until then, reports fall back to text-only.
+LOGO_CANDIDATES = [
+    os.path.join(_STATIC_DIR, "images", "logo.png"),
+    os.path.join(_STATIC_DIR, "images", "logo.jpg"),
+    os.path.join(_STATIC_DIR, "images", "logo.jpeg"),
+]
+
+
+def _find_logo_path():
+    for path in LOGO_CANDIDATES:
+        if os.path.exists(path):
+            return path
+    return None
 
 _fonts_registered = False
 
@@ -108,8 +124,27 @@ class ReportService:
 
         story = []
 
-        story.append(Paragraph("ISKCON Shirpur", title_style))
-        story.append(Paragraph("Department Expense Statement", sub_style))
+        logo_path = _find_logo_path()
+        if logo_path:
+            try:
+                logo = RLImage(logo_path, width=28 * mm, height=28 * mm, kind="proportional")
+                header_table = Table(
+                    [[logo, [Paragraph("ISKCON Shirpur", title_style), Paragraph("Department Expense Statement", sub_style)]]],
+                    colWidths=[34 * mm, None]
+                )
+                header_table.setStyle(TableStyle([
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ]))
+                story.append(header_table)
+            except Exception:
+                # Never let a bad/corrupt logo file break report generation.
+                story.append(Paragraph("ISKCON Shirpur", title_style))
+                story.append(Paragraph("Department Expense Statement", sub_style))
+        else:
+            story.append(Paragraph("ISKCON Shirpur", title_style))
+            story.append(Paragraph("Department Expense Statement", sub_style))
         story.append(Spacer(1, 10))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e5e7eb")))
         story.append(Spacer(1, 10))

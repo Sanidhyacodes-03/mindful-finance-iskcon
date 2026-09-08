@@ -52,6 +52,10 @@
         {% if g.user['role'] == 'admin' %}
             <a href="{{ url_for('departments') }}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">+ New Department</a>
         {% endif %}
+        {% if g.user['role'] == 'manager' %}
+            <a href="{{ url_for('export_report_pdf') }}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">📄 Download PDF Report</a>
+            <a href="{{ url_for('export_report_csv') }}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">📊 Download CSV Report</a>
+        {% endif %}
         <a href="{{ url_for('alerts') }}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">{{ '+ Raise Alert' if g.user['role'] == 'admin' else 'View Alerts' }}</a>
     </div>
 </div>
