@@ -5,6 +5,9 @@
 {% block content %}
 
 <section style="text-align: center; max-width: 720px; margin: 3rem auto 4rem; padding: 2.5rem 2rem; background: rgba(255, 252, 247, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(45, 27, 14, 0.25);">
+    {% if logo_url %}
+    <img src="{{ logo_url }}" class="brand-logo-img" style="margin: 0 auto 1.5rem; height: 100px; max-width: 100%;" alt="ISKCON Shirpur">
+    {% endif %}
     <div class="krishna-hero" style="margin: 0 auto 1.5rem; opacity: 1; transform: none;">
         <div class="krishna-hero__halo" aria-hidden="true"></div>
         <div class="krishna-hero__frame">

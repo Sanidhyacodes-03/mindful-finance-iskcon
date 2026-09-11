@@ -153,7 +153,7 @@ def enforce_manager_scope():
             return redirect(url_for('dashboard'))
 
 
-LOGO_FILENAMES = ["logo.png", "logo.jpg", "logo.jpeg", "logo.svg"]
+LOGO_FILENAMES = ["iskcon.jpg", "iskcon.png", "logo.png", "logo.jpg", "logo.jpeg", "logo.svg"]
 
 
 def _find_logo_url():

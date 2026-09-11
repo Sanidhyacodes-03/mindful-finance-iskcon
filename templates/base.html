@@ -91,14 +91,14 @@
             <div class="nav-inner">
                 <a href="{{ url_for('landing') }}" class="nav-brand">
                     {% if logo_url %}
-                        <img src="{{ logo_url }}" class="brand-icon brand-icon--logo" alt="ISKCON Shirpur">
+                        <img src="{{ logo_url }}" class="brand-logo-img" alt="ISKCON Shirpur">
                     {% else %}
                         <span class="brand-icon">🪷</span>
+                        <span>
+                            <span class="brand-name">ISKCON Shirpur</span>
+                            <span class="nav-brand__subtitle">Mindful Finance</span>
+                        </span>
                     {% endif %}
-                    <span>
-                        <span class="brand-name">ISKCON Shirpur</span>
-                        <span class="nav-brand__subtitle">Mindful Finance</span>
-                    </span>
                 </a>
 
                 {% if g.user %}
@@ -157,7 +157,7 @@
             <div class="footer-inner">
                 <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: var(--text-main);">
                     {% if logo_url %}
-                        <img src="{{ logo_url }}" class="brand-icon brand-icon--logo" style="width: 24px; height: 24px;" alt="ISKCON Shirpur">
+                        <img src="{{ logo_url }}" class="brand-logo-img" style="height: 22px;" alt="ISKCON Shirpur">
                     {% else %}
                         <span class="brand-icon" style="width: 24px; height: 24px; font-size: 0.8rem;">🪷</span>
                     {% endif %}

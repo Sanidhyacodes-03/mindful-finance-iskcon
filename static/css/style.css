@@ -135,10 +135,13 @@ a {
     transform: rotate(12deg) scale(1.05);
 }
 
-.brand-icon--logo {
-    background: none;
-    box-shadow: none;
+.brand-logo-img {
+    height: 42px;
+    max-height: 42px;
+    width: auto;
+    max-width: 240px;
     object-fit: contain;
+    display: block;
 }
 
 .nav-links {

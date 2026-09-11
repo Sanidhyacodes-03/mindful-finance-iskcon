@@ -20,9 +20,12 @@ FONT_DIR = os.path.join(_STATIC_DIR, "fonts")
 FONT_REGULAR = "DejaVuSans"
 FONT_BOLD = "DejaVuSans-Bold"
 
-# Drop the official logo at static/images/logo.png (or .jpg) to have it appear here
-# automatically — no code change needed. Until then, reports fall back to text-only.
+# Drop the official logo at static/images/iskcon.jpg (or logo.png/.jpg) to have it
+# appear here automatically — no code change needed. Until then, reports fall back
+# to text-only.
 LOGO_CANDIDATES = [
+    os.path.join(_STATIC_DIR, "images", "iskcon.jpg"),
+    os.path.join(_STATIC_DIR, "images", "iskcon.png"),
     os.path.join(_STATIC_DIR, "images", "logo.png"),
     os.path.join(_STATIC_DIR, "images", "logo.jpg"),
     os.path.join(_STATIC_DIR, "images", "logo.jpeg"),
