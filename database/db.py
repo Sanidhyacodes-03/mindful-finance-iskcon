@@ -1,22 +1,137 @@
-import sqlite3
 import os
+import re
+import sqlite3
+import weakref
 from datetime import datetime, timedelta
+
+import psycopg2
+import psycopg2.extras
+from psycopg2.pool import ThreadedConnectionPool
+
+from config import DATABASE_URL, IS_POSTGRES, PG_POOL_MINCONN, PG_POOL_MAXCONN
 from services.security import hash_password
 
 # DATA_DIR points this at a mounted persistent disk in production (e.g. Render).
 # Unset locally, so DB_PATH resolves to the project root exactly as before.
+# Only used on the SQLite path — irrelevant once DATABASE_URL is set.
 _DATA_DIR = os.environ.get("DATA_DIR") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(_DATA_DIR, "spendly.db")
 
+
+# ------------------------------------------------------------------ #
+# Postgres compatibility layer
+# ------------------------------------------------------------------ #
+# Everything below exists so app.py / report_service.py / scheduler_service.py
+# don't need to change at all: they keep writing "?" placeholders, keep reading
+# cursor.lastrowid after an INSERT, and keep accessing rows as row['col'] /
+# row[0] exactly as they do against sqlite3.Row today.
+
+_INSERT_RE = re.compile(r'^\s*INSERT\s+INTO', re.IGNORECASE)
+_RETURNING_RE = re.compile(r'\bRETURNING\b', re.IGNORECASE)
+_pg_pool = None
+
+
+class _PGCursorWrapper:
+    """Makes a psycopg2 DictCursor behave like sqlite3's cursor for this app's
+    usage: '?' placeholders and a working .lastrowid after INSERTs."""
+
+    def __init__(self, real_cursor):
+        self._cursor = real_cursor
+        self.lastrowid = None
+
+    def execute(self, query, params=None):
+        translated = query.replace('?', '%s')  # safe: no query text contains a literal '?'
+        if _INSERT_RE.match(translated) and not _RETURNING_RE.search(translated):
+            translated = translated.rstrip().rstrip(';') + ' RETURNING id'
+            self._cursor.execute(translated, params or ())
+            row = self._cursor.fetchone()
+            # Idempotent seeding (ON CONFLICT DO NOTHING) legitimately returns 0 rows
+            # on every run after the first — this is steady-state, not an edge case.
+            self.lastrowid = row['id'] if row else None
+        else:
+            self._cursor.execute(translated, params or ())
+        return self._cursor
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _PGConnectionWrapper:
+    """Drop-in replacement for the sqlite3 connection object this app already
+    uses: .cursor() / .commit() / .rollback() / .close()."""
+
+    def __init__(self, pool):
+        self._pool = pool
+        self._conn = pool.getconn()
+        self._closed = False
+        # Returns the connection to the pool even if a route raises before reaching
+        # its db.close() call — none of app.py's ~30 get_db() call sites use
+        # try/finally. weakref.finalize fires as soon as this wrapper is garbage
+        # collected (effectively immediately under CPython refcounting once the
+        # caller's local `db` variable goes out of scope), so this isn't relying
+        # on an unpredictable GC cycle.
+        self._finalizer = weakref.finalize(self, pool.putconn, self._conn)
+
+    def cursor(self):
+        real_cursor = self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        return _PGCursorWrapper(real_cursor)
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        if not self._closed:
+            self._closed = True
+            self._finalizer()
+
+
+def _get_pg_pool():
+    global _pg_pool
+    if _pg_pool is None:
+        _pg_pool = ThreadedConnectionPool(minconn=PG_POOL_MINCONN, maxconn=PG_POOL_MAXCONN, dsn=DATABASE_URL)
+    return _pg_pool
+
+
+def month_filter_sql(column_expr):
+    """Dialect-aware month filter — both compare against '=  ?' with a 'YYYY-MM'
+    value, against the existing 'YYYY-MM-DD' TEXT date columns."""
+    if IS_POSTGRES:
+        return f"LEFT({column_expr}, 7)"
+    return f"strftime('%Y-%m', {column_expr})"
+
+
 def get_db():
+    if IS_POSTGRES:
+        return _PGConnectionWrapper(_get_pg_pool())
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
+
+    if IS_POSTGRES:
+        # Schema is created once via supabase_schema.sql in the Supabase SQL Editor,
+        # not auto-created here — see that file for the full CREATE TABLE statements.
+        print("Postgres detected (DATABASE_URL set). Skipping schema auto-creation — "
+              "run supabase_schema.sql in the Supabase SQL Editor once, if you haven't already.")
+        for role_name in ("admin", "auditor", "manager"):
+            cursor.execute("INSERT INTO roles (name) VALUES (?) ON CONFLICT (name) DO NOTHING", (role_name,))
+        conn.commit()
+        conn.close()
+        return
 
     # Roles Table — a real normalized table (not just an enum column) so role
     # metadata/permissions can grow without a schema migration later.

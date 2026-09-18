@@ -9,7 +9,7 @@ from flask import (
     Response, send_from_directory
 )
 from werkzeug.utils import secure_filename
-from database.db import get_db, init_db, seed_db, log_activity
+from database.db import get_db, init_db, seed_db, log_activity, month_filter_sql
 from services.email_service import EmailService
 from services.whatsapp_service import WhatsAppService
 from services.report_service import ReportService
@@ -219,7 +219,7 @@ def _check_budget_cap(cursor, department_id, additional_amount, exclude_expense_
     monthly_limit = budget_row['monthly_limit']
 
     cur_month = datetime.now().strftime("%Y-%m")
-    query = "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE department_id = ? AND strftime('%Y-%m', date) = ?"
+    query = f"SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE department_id = ? AND {month_filter_sql('date')} = ?"
     params = [department_id, cur_month]
     if exclude_expense_id is not None:
         query += " AND id != ?"
@@ -434,7 +434,7 @@ def dashboard():
     d_dept_filter = f" AND d.id IN {in_clause}" if scoped else ""
 
     cursor.execute(
-        f"SELECT SUM(amount) as total FROM expenses e WHERE strftime('%Y-%m', e.date) = ?{e_dept_filter}",
+        f"SELECT SUM(amount) as total FROM expenses e WHERE {month_filter_sql('e.date')} = ?{e_dept_filter}",
         [cur_month] + dept_params
     )
     month_spent = cursor.fetchone()['total'] or 0.0
@@ -448,7 +448,7 @@ def dashboard():
     cursor.execute(f"""
         SELECT d.id, d.name, d.icon, d.color, d.is_active,
                COALESCE(b.monthly_limit, 0) as monthly_limit,
-               COALESCE(SUM(CASE WHEN strftime('%Y-%m', e.date) = ? THEN e.amount END), 0.0) as spent
+               COALESCE(SUM(CASE WHEN {month_filter_sql('e.date')} = ? THEN e.amount END), 0.0) as spent
         FROM departments d
         LEFT JOIN budgets b ON b.department_id = d.id
         LEFT JOIN expenses e ON e.department_id = d.id
@@ -509,9 +509,9 @@ def departments():
     now = datetime.now()
     cur_month = now.strftime("%Y-%m")
 
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT d.*, COALESCE(b.monthly_limit, 0) as monthly_limit,
-               COALESCE(SUM(CASE WHEN strftime('%Y-%m', e.date) = ? THEN e.amount END), 0.0) as spent,
+               COALESCE(SUM(CASE WHEN {month_filter_sql('e.date')} = ? THEN e.amount END), 0.0) as spent,
                COUNT(e.id) as expense_count,
                m.name as manager_name, m.email as manager_email, m.is_active as manager_is_active
         FROM departments d
@@ -961,7 +961,7 @@ def budgets():
 
     cursor.execute(f"""
         SELECT b.id as budget_id, b.monthly_limit, d.id as department_id, d.name, d.icon, d.color,
-               COALESCE(SUM(CASE WHEN strftime('%Y-%m', e.date) = ? THEN e.amount END), 0.0) as spent
+               COALESCE(SUM(CASE WHEN {month_filter_sql('e.date')} = ? THEN e.amount END), 0.0) as spent
         FROM departments d
         LEFT JOIN budgets b ON b.department_id = d.id
         LEFT JOIN expenses e ON e.department_id = d.id
