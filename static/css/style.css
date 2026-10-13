@@ -135,6 +135,10 @@ a {
     transform: rotate(12deg) scale(1.05);
 }
 
+img.brand-icon {
+    object-fit: cover;
+}
+
 .brand-logo-img {
     height: 42px;
     max-height: 42px;
@@ -221,6 +225,48 @@ a {
 .nav-link:hover, .nav-link.active {
     color: var(--primary);
     background: var(--primary-light);
+}
+
+/* Compact icon navbar: icon-only + hover tooltip (title attr) on desktop,
+   icon + visible label once the nav collapses into the mobile menu above. */
+.nav-link--icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+}
+
+.nav-link__icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-link__icon svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    display: block;
+}
+
+.nav-link__label {
+    display: none;
+    font-size: 0.9rem;
+}
+
+/* Once the navbar collapses into the mobile menu, show the label next to the
+   icon too — must come after the base .nav-link__label rule above so it wins
+   the cascade at equal specificity. */
+@media (max-width: 1024px) {
+    .nav-link--icon {
+        gap: 0.6rem;
+    }
+
+    .nav-link__label {
+        display: inline;
+    }
 }
 
 .nav-cta {
@@ -398,6 +444,155 @@ a {
     .grid-2, .grid-3 {
         grid-template-columns: 1fr;
     }
+}
+
+/* ================================================================== */
+/* Quick-Access Icon Grid (dashboard)                                 */
+/* ================================================================== */
+
+.quick-access-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.quick-access-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 1rem 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    font-family: inherit;
+    cursor: pointer;
+    min-height: 44px;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.quick-access-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: rgba(212, 168, 67, 0.35);
+}
+
+.quick-access-tile__icon {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.quick-access-tile__label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-main);
+    text-align: center;
+}
+
+/* ================================================================== */
+/* Dashboard KPI Row (compact, mobile-first)                          */
+/* ================================================================== */
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.stat-grid .card {
+    padding: 0.85rem;
+}
+
+.stat-grid .stat-value {
+    font-size: 1.35rem;
+}
+
+@media (max-width: 640px) {
+    .stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+
+    .stat-grid .card {
+        padding: 0.85rem;
+    }
+
+    .stat-grid .stat-label {
+        font-size: 0.7rem;
+    }
+
+    .stat-grid .stat-value {
+        font-size: 1.3rem;
+    }
+
+    .stat-grid .stat-badge {
+        font-size: 0.68rem;
+        padding: 0.2rem 0.45rem;
+    }
+}
+
+/* ================================================================== */
+/* Compact Department Tiles (dashboard)                               */
+/* ================================================================== */
+
+.dept-tile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 2rem;
+}
+
+.dept-tile {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    min-height: 44px;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.dept-tile:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.dept-tile__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.dept-tile__name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.dept-tile__bar {
+    width: 100%;
+    height: 5px;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0 0.35rem;
+}
+
+.dept-tile__bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.dept-tile__amount {
+    font-size: 0.78rem;
+    color: var(--text-muted);
 }
 
 /* ================================================================== */
@@ -606,6 +801,7 @@ a {
 
 .btn-danger { background: var(--rose-bg); color: var(--rose); border: 1px solid #fecdd3; }
 .btn-danger:hover { background: #ffe4e6; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .form-group {
     margin-bottom: 1.25rem;

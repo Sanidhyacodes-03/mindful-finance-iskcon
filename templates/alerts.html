@@ -9,7 +9,7 @@
         <h1 class="page-title">Alerts & Queries</h1>
         <p class="page-subtitle">Department alerts and questions raised about specific expense records.</p>
     </div>
-    {% if g.user['role'] in ('admin', 'auditor') %}
+    {% if g.user['role'] in ('accountant', 'tmc_member') %}
     <button onclick="openModal('addAlertModal')" class="btn btn-primary">
         + New Alert / Query
     </button>
@@ -68,12 +68,13 @@
 
         <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.75rem;">
             {% if a.department_name %}<span>🏛️ {{ a.department_name }}</span>{% endif %}
+            {% if a.assigned_to_name %}<span>📨 To: {{ a.assigned_to_name }}</span>{% endif %}
             {% if a.expense_description %}<span>🧾 Tagged expense: {{ a.expense_description }} (₹{{ "{:,.2f}".format(a.expense_amount) }})</span>{% endif %}
             <span>Raised by {{ a.created_by_name or 'System' }} on {{ a.created_at }}</span>
             {% if a.is_resolved %}<span>Resolved by {{ a.resolved_by_name or 'System' }} on {{ a.resolved_at }}</span>{% endif %}
         </div>
 
-        {% if g.user['role'] == 'admin' and not a.is_resolved %}
+        {% if g.user['role'] == 'accountant' and not a.is_resolved %}
         <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
             <form method="POST" action="{{ url_for('resolve_alert', id=a.id) }}">
                 <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">Mark Resolved</button>
@@ -89,7 +90,7 @@
     {% endfor %}
 </div>
 
-{% if g.user['role'] in ('admin', 'auditor') %}
+{% if g.user['role'] in ('accountant', 'tmc_member') %}
 <!-- Add Alert/Query Modal -->
 <div class="modal-overlay" id="addAlertModal">
     <div class="modal-content">
@@ -100,17 +101,30 @@
 
         <form method="POST" action="{{ url_for('add_alert') }}">
             <div class="form-group">
-                <label class="form-label">Type</label>
-                <select name="type" class="form-select">
+                <label class="form-label" for="alertType">Type</label>
+                <select name="type" id="alertType" class="form-select" onchange="syncAlertRecipient()">
                     <option value="alert">Department Alert</option>
                     <option value="query">Query on an Expense</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label class="form-label">Target</label>
+                <label class="form-label" for="alertAssignedTo">Send to</label>
+                <select name="assigned_to" id="alertAssignedTo" class="form-select">
+                    <option value="" id="alertAssignedToDefault">— Everyone who can see the department —</option>
+                    {% for r in recipients %}
+                        <option value="{{ r.id }}">{{ r.name }} ({{ role_labels.get(r.role, r.role) }})</option>
+                    {% endfor %}
+                </select>
+                <p id="alertAssignedToHint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; display: none;">
+                    Only this person (and Accountants / TMC Members) will see the query.
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Department (optional)</label>
                 <select name="department_id" class="form-select">
-                    <option value="">— Admins / Org-wide —</option>
+                    <option value="">— No department (org-wide) —</option>
                     {% for d in departments %}
                         <option value="{{ d.id }}">{{ d.icon }} {{ d.name }}</option>
                     {% endfor %}
@@ -153,6 +167,18 @@
         </form>
     </div>
 </div>
+<script>
+// A query must name its recipient — otherwise it would reach the department's
+// Manager by default. Alerts may still go to everyone viewing the department.
+function syncAlertRecipient() {
+    var isQuery = document.getElementById('alertType').value === 'query';
+    var select = document.getElementById('alertAssignedTo');
+    var fallback = document.getElementById('alertAssignedToDefault');
+    select.required = isQuery;
+    fallback.textContent = isQuery ? '— Choose a person —' : '— Everyone who can see the department —';
+    document.getElementById('alertAssignedToHint').style.display = isQuery ? 'block' : 'none';
+}
+</script>
 {% endif %}
 
 {% endblock %}

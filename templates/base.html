@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ISKCON Shirpur — Mindful Expense Tracker{% endblock %}</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='images/iskcon-shirpur-logo.jpeg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -90,15 +91,11 @@
         <nav class="navbar">
             <div class="nav-inner">
                 <a href="{{ url_for('landing') }}" class="nav-brand">
-                    {% if logo_url %}
-                        <img src="{{ logo_url }}" class="brand-logo-img" alt="ISKCON Shirpur">
-                    {% else %}
-                        <span class="brand-icon">🪷</span>
-                        <span>
-                            <span class="brand-name">ISKCON Shirpur</span>
-                            <span class="nav-brand__subtitle">Mindful Finance</span>
-                        </span>
-                    {% endif %}
+                    <img src="{{ url_for('static', filename='images/iskcon-shirpur-logo.jpeg') }}" class="brand-icon" alt="ISKCON Shirpur logo">
+                    <span>
+                        <span class="brand-name">ISKCON Shirpur</span>
+                        <span class="nav-brand__subtitle">Mindful Finance</span>
+                    </span>
                 </a>
 
                 {% if g.user %}
@@ -107,18 +104,30 @@
 
                 <div class="nav-links" id="navLinks">
                     {% if g.user %}
-                        <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+                        {% if g.user['role'] != 'pending' %}
+                        <a href="{{ url_for('dashboard') }}" class="nav-link nav-link--icon {% if request.endpoint == 'dashboard' %}active{% endif %}" title="Dashboard">
+                            <span class="nav-link__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span class="nav-link__label">Dashboard</span>
+                        </a>
+                        <a href="{{ url_for('expenses') }}" class="nav-link nav-link--icon {% if request.endpoint in ('expenses', 'budgets') %}active{% endif %}" title="Finances">
+                            <span class="nav-link__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span><span class="nav-link__label">Finances</span>
+                        </a>
                         {% if g.user['role'] != 'manager' %}
-                            <a href="{{ url_for('departments') }}" class="nav-link {% if request.endpoint == 'departments' %}active{% endif %}">Departments</a>
+                        <a href="{{ url_for('departments') }}" class="nav-link nav-link--icon {% if request.endpoint == 'departments' %}active{% endif %}" title="Departments">
+                            <span class="nav-link__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg></span><span class="nav-link__label">Departments</span>
+                        </a>
                         {% endif %}
-                        <a href="{{ url_for('expenses') }}" class="nav-link {% if request.endpoint == 'expenses' %}active{% endif %}">Expenses</a>
-                        <a href="{{ url_for('budgets') }}" class="nav-link {% if request.endpoint == 'budgets' %}active{% endif %}">Budgets</a>
-                        {% if g.user['role'] != 'manager' %}
-                            <a href="{{ url_for('activity_log') }}" class="nav-link {% if request.endpoint == 'activity_log' %}active{% endif %}">Activity Log</a>
+                        <a href="{{ url_for('reports') }}" class="nav-link nav-link--icon {% if request.endpoint in ('reports', 'activity_log') %}active{% endif %}" title="Reports">
+                            <span class="nav-link__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg></span><span class="nav-link__label">Reports</span>
+                        </a>
+                        {% if g.user['role'] in ('accountant', 'tmc_member') %}
+                        <a href="{{ url_for('admin_donations') }}" class="nav-link nav-link--icon {% if request.endpoint == 'admin_donations' %}active{% endif %}" title="Donations">
+                            <span class="nav-link__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span><span class="nav-link__label">Donations</span>
+                        </a>
                         {% endif %}
-                        <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">Reports</a>
-                        {% if g.user['role'] == 'admin' %}
-                            <a href="{{ url_for('manage_users') }}" class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}">Manage Users</a>
+                        {% if g.user['role'] == 'accountant' %}
+                        <a href="{{ url_for('manage_users') }}" class="nav-link nav-link--icon {% if request.endpoint == 'manage_users' %}active{% endif %}" title="Users">
+                            <span class="nav-link__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-link__label">Users</span>
+                        </a>
                         {% endif %}
 
                         <a href="{{ url_for('alerts') }}" class="notification-badge" title="Alerts &amp; Queries">
@@ -128,8 +137,13 @@
                             {% endif %}
                         </a>
 
-                        <a href="{{ url_for('profile') }}" class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}">👤 {{ g.user['name'].split()[0] }}</a>
-                        <a href="{{ url_for('logout') }}" class="nav-link" style="color: var(--rose);">Sign out</a>
+                        <a href="{{ url_for('profile') }}" class="nav-link nav-link--icon {% if request.endpoint == 'profile' %}active{% endif %}" title="Profile: {{ g.user['name'] }}">
+                            <span class="nav-link__icon" aria-hidden="true">👤</span><span class="nav-link__label">{{ g.user['name'].split()[0] }}</span>
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('logout') }}" class="nav-link nav-link--icon" style="color: var(--rose);" title="Sign out">
+                            <span class="nav-link__icon" aria-hidden="true">🚪</span><span class="nav-link__label">Sign out</span>
+                        </a>
                     {% else %}
                         <a href="{{ url_for('login') }}" class="nav-cta">Sign in</a>
                     {% endif %}
@@ -156,11 +170,7 @@
         <footer class="footer">
             <div class="footer-inner">
                 <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: var(--text-main);">
-                    {% if logo_url %}
-                        <img src="{{ logo_url }}" class="brand-logo-img" style="height: 22px;" alt="ISKCON Shirpur">
-                    {% else %}
-                        <span class="brand-icon" style="width: 24px; height: 24px; font-size: 0.8rem;">🪷</span>
-                    {% endif %}
+                    <img src="{{ url_for('static', filename='images/iskcon-shirpur-logo.jpeg') }}" class="brand-icon" style="width: 24px; height: 24px;" alt="ISKCON Shirpur logo">
                     <span>ISKCON Shirpur Finance</span>
                 </div>
                 <p>Mindful Expense Management — हरे कृष्ण</p>
@@ -174,6 +184,56 @@
 
     <script src="{{ url_for('static', filename='js/spiritual.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block clerk_session %}
+    {% if clerk_enabled and g.user %}
+    <!-- Clerk session tokens last 60 seconds. Clerk's JS refreshes the __session
+         cookie in the background while a page is open, so the next page the
+         server renders already has a valid token and is verified locally. -->
+    <script
+        async
+        crossorigin="anonymous"
+        id="clerk-session-js"
+        data-clerk-publishable-key="{{ clerk_publishable_key }}"
+        src="https://{{ clerk_frontend_api }}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    ></script>
+    <script>
+    (function () {
+        var clerkReady = new Promise(function (resolve) {
+            var tag = document.getElementById('clerk-session-js');
+            tag.addEventListener('load', function () { window.Clerk.load().then(resolve, resolve); });
+            tag.addEventListener('error', resolve);
+        });
+
+        // Before a form posts, make sure the cookie it carries is current — a token
+        // that expired while the form was being filled in would lose the submission.
+        // Waits at most 3 seconds, then submits regardless.
+        document.addEventListener('submit', function (event) {
+            var form = event.target;
+            if (event.defaultPrevented || form.dataset.clerkFresh || form.method.toLowerCase() !== 'post') return;
+            event.preventDefault();
+            var submitter = event.submitter;
+            var timeout = new Promise(function (resolve) { setTimeout(resolve, 3000); });
+            var refresh = clerkReady.then(function () {
+                return window.Clerk && window.Clerk.session ? window.Clerk.session.getToken() : null;
+            }).catch(function () {});
+            Promise.race([refresh, timeout]).then(function () {
+                form.dataset.clerkFresh = '1';
+                // form.submit() skips onsubmit (so confirm() dialogs don't repeat)
+                // but also drops the clicked button's name/value — carry it over.
+                if (submitter && submitter.name) {
+                    var carried = document.createElement('input');
+                    carried.type = 'hidden';
+                    carried.name = submitter.name;
+                    carried.value = submitter.value;
+                    form.appendChild(carried);
+                }
+                form.submit();
+            });
+        });
+    })();
+    </script>
+    {% endif %}
+    {% endblock %}
     {% block scripts %}{% endblock %}
 </body>
 </html>

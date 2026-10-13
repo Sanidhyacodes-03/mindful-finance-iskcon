@@ -7,11 +7,8 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Manage Users</h1>
-        <p class="page-subtitle">Create and manage Admin and Auditor accounts. Only Admins can access this page.</p>
+        <p class="page-subtitle">Manage Accountant, TMC Member and Manager accounts. New people sign up themselves and are approved from the Dashboard. Only Accountants can access this page.</p>
     </div>
-    <button onclick="openModal('addUserModal')" class="btn btn-primary">
-        + New User
-    </button>
 </div>
 
 <div class="table-wrapper">
@@ -33,25 +30,37 @@
                 <tr style="{% if not u.is_active %}opacity: 0.6;{% endif %}">
                     <td style="font-weight: 500;">{{ u.name }}{% if u.id == g.user['id'] %} <span style="color: var(--text-muted); font-size: 0.75rem;">(you)</span>{% endif %}</td>
                     <td style="color: var(--text-muted); font-size: 0.85rem;">{{ u.email }}</td>
-                    <td><span class="stat-badge {% if u.role == 'admin' %}positive{% else %}neutral{% endif %}">{{ u.role|capitalize }}</span></td>
+                    <td><span class="stat-badge {% if u.role == 'accountant' %}positive{% else %}neutral{% endif %}">{{ role_labels.get(u.role, u.role) }}</span></td>
                     <td style="color: var(--text-muted); font-size: 0.85rem;">{{ u.phone_number or '-' }}</td>
                     <td><span class="stat-badge {% if u.is_active %}positive{% else %}negative{% endif %}">{{ 'Active' if u.is_active else 'Inactive' }}</span></td>
                     <td style="color: var(--text-muted); font-size: 0.8rem;">{{ u.created_at }}</td>
                     <td style="text-align: center;">
                         <div style="display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;">
                             <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                onclick="openEditUser({{ u.id }}, {{ u.name|tojson }}, {{ u.role|tojson }}, {{ (u.phone_number or '')|tojson }}, {{ u.is_active }})">
+                                onclick="openEditUser({{ u.id }}, {{ u.name|tojson|forceescape }}, {{ u.role|tojson|forceescape }}, {{ (u.phone_number or '')|tojson|forceescape }}, {{ u.is_active }})">
                                 Edit
                             </button>
+                            {% if not clerk_enabled %}
                             <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                onclick="openResetPassword({{ u.id }}, {{ u.name|tojson }})">
+                                onclick="openResetPassword({{ u.id }}, {{ u.name|tojson|forceescape }})">
                                 Reset Password
                             </button>
-                            {% if u.is_active %}
-                            <form method="POST" action="{{ url_for('delete_user', id=u.id) }}" onsubmit="return confirm('Deactivate {{ u.name }}?');">
-                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Deactivate</button>
-                            </form>
                             {% endif %}
+                            {% set is_self = u.id == g.user['id'] %}
+                            <form method="POST" action="{{ url_for('toggle_user_status', user_id=u.id) }}" onsubmit="return confirm('Deactivate ' + {{ u.name|tojson|forceescape }} + '? They will lose access until reactivated.');">
+                                <input type="hidden" name="status" value="inactive">
+                                <button type="submit" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                    {% if not u.is_active or is_self %}disabled title="{{ 'You cannot deactivate yourself' if is_self else 'Already inactive' }}"{% endif %}>Deactivate</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('toggle_user_status', user_id=u.id) }}">
+                                <input type="hidden" name="status" value="active">
+                                <button type="submit" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                    {% if u.is_active %}disabled title="Already active"{% endif %}>Activate</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}" onsubmit="return confirm('Permanently delete ' + {{ u.name|tojson|forceescape }} + '? This cannot be undone. Their expenses and records are kept.');">
+                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                    {% if is_self %}disabled title="You cannot delete yourself"{% endif %}>Delete</button>
+                            </form>
                         </div>
                     </td>
                 </tr>
@@ -61,46 +70,6 @@
             {% endif %}
         </tbody>
     </table>
-</div>
-
-<!-- Add User Modal -->
-<div class="modal-overlay" id="addUserModal">
-    <div class="modal-content">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-            <h3 style="font-size: 1.2rem; font-weight: 700;">New User Account</h3>
-            <button onclick="closeModal('addUserModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
-        </div>
-        <form method="POST" action="{{ url_for('add_user') }}">
-            <div class="form-group">
-                <label class="form-label">Full Name</label>
-                <input type="text" name="name" class="form-input" required autofocus>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Email Address</label>
-                <input type="email" name="email" class="form-input" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Temporary Password</label>
-                <input type="password" name="password" class="form-input" minlength="6" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Role</label>
-                <select name="role" class="form-select">
-                    <option value="auditor">Auditor (read-only)</option>
-                    <option value="admin">Admin (full access)</option>
-                    <option value="manager">Manager (department-scoped)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Phone Number (optional)</label>
-                <input type="tel" name="phone" class="form-input" placeholder="+91XXXXXXXXXX">
-            </div>
-            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">Create Account</button>
-                <button type="button" onclick="closeModal('addUserModal')" class="btn btn-secondary">Cancel</button>
-            </div>
-        </form>
-    </div>
 </div>
 
 <!-- Edit User Modal -->
@@ -118,8 +87,8 @@
             <div class="form-group">
                 <label class="form-label">Role</label>
                 <select name="role" id="editUserRole" class="form-select">
-                    <option value="auditor">Auditor (read-only)</option>
-                    <option value="admin">Admin (full access)</option>
+                    <option value="tmc_member">TMC Member (read-only)</option>
+                    <option value="accountant">Accountant (full access)</option>
                     <option value="manager">Manager (department-scoped)</option>
                 </select>
             </div>

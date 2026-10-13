@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Awaiting Approval — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="card card--spiritual card--animate-in" style="max-width: 520px; margin: 3rem auto; text-align: center;">
+    <img src="{{ url_for('static', filename='images/iskcon-shirpur-logo.jpeg') }}" class="brand-logo-img" style="margin: 0 auto 0.75rem; height: 84px; max-width: 100%;" alt="ISKCON Shirpur logo">
+    <h1 class="page-title" style="font-size: 1.5rem; margin-bottom: 0.5rem;">Your account is pending Accountant approval</h1>
+    <p style="color: var(--text-muted); margin-bottom: 0.75rem;">
+        Hare Krishna, {{ g.user['name'].split()[0] }}! Your sign-in worked, and a request for access has been sent to the
+        ISKCON Shirpur Finance Accountant.
+    </p>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+        You'll be able to use the app once the Accountant approves your account and assigns your role.
+        Signed in as <strong>{{ g.user['email'] }}</strong>.
+    </p>
+    <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('login') }}" class="btn btn-primary">Check again</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Sign out</a>
+    </div>
+</div>
+
+{% endblock %}

@@ -10,6 +10,12 @@
 --
 -- Safe to re-run: every statement is idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING).
 
+-- If you already ran this script before Clerk support was added, run just these two
+-- lines against your existing database (Supabase SQL Editor) to link users to Clerk
+-- without re-running the whole script — the CREATE TABLE below is a no-op for you:
+--   ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT UNIQUE;
+--   ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
 CREATE TABLE IF NOT EXISTS roles (
     id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name TEXT UNIQUE NOT NULL
@@ -19,7 +25,8 @@ CREATE TABLE IF NOT EXISTS users (
     id                    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name                  TEXT NOT NULL,
     email                 TEXT UNIQUE NOT NULL,
-    password_hash         TEXT NOT NULL,
+    password_hash         TEXT,
+    clerk_id              TEXT UNIQUE,
     role_id               INTEGER NOT NULL REFERENCES roles(id),
     is_active             INTEGER NOT NULL DEFAULT 1,
     phone_number          TEXT,
@@ -73,7 +80,9 @@ CREATE TABLE IF NOT EXISTS alerts (
     created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
     resolved_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
     resolved_at    TIMESTAMP,
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- The person a query/alert is addressed to; NULL = the department's viewers.
+    assigned_to    INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -84,6 +93,21 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     entity_id    INTEGER,
     details      TEXT,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Donations logged by Admins and forwarded to an external API.
+-- (The app also creates this table on startup if it's missing.)
+CREATE TABLE IF NOT EXISTS donations (
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    donor_name      TEXT NOT NULL,
+    amount          REAL NOT NULL,
+    payment_method  TEXT NOT NULL CHECK (payment_method IN ('Cash', 'UPI', 'Bank')),
+    transaction_id  TEXT,
+    notes           TEXT,
+    webhook_status  TEXT NOT NULL DEFAULT 'pending',
+    recorded_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    dob             DATE  -- donor's date of birth (optional)
 );
 
 -- Postgres doesn't auto-index foreign-key columns (unlike the primary key). These cover
@@ -101,7 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id      ON audit_logs(user_id);
 
 -- The app also seeds these on startup (idempotent, ON CONFLICT DO NOTHING) — running
 -- it here too just means they exist immediately rather than on first request.
-INSERT INTO roles (name) VALUES ('admin'), ('auditor'), ('manager')
+INSERT INTO roles (name) VALUES ('accountant'), ('tmc_member'), ('manager'), ('pending')
 ON CONFLICT (name) DO NOTHING;
 
 -- Note: demo accounts (admin@iskconshirpur.org etc.) and sample departments/expenses are

@@ -29,8 +29,8 @@
 
             <div class="form-group">
                 <label class="form-label">Role</label>
-                <input type="text" class="form-input" value="{{ user.role|capitalize }}" disabled style="background: var(--bg-subtle);">
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Roles are managed by an Administrator.</span>
+                <input type="text" class="form-input" value="{{ role_labels.get(user.role, user.role) }}" disabled style="background: var(--bg-subtle);">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Roles are managed by an Accountant.</span>
             </div>
 
             <div class="form-group">

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Signing out — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="card card--spiritual card--animate-in" style="max-width: 440px; margin: 4rem auto; text-align: center;">
+    <p style="color: var(--text-muted);">Signing you out…</p>
+</div>
+
+{% endblock %}
+
+{# This page loads Clerk itself to sign out — don't load it a second time. #}
+{% block clerk_session %}{% endblock %}
+
+{% block scripts %}
+<script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key="{{ clerk_publishable_key }}"
+    src="https://{{ clerk_frontend_api }}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+></script>
+<script>
+    window.addEventListener('load', async () => {
+        await window.Clerk.load();
+        await window.Clerk.signOut();
+        window.location.href = "{{ url_for('landing') }}";
+    });
+</script>
+{% endblock %}

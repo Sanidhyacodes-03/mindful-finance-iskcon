@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Reports — ISKCON Shirpur Finance{% endblock %}
+{% block title %}Reports & Audit — ISKCON Shirpur Finance{% endblock %}
 
 {% block content %}
 
 <div class="page-header">
     <div>
-        <h1 class="page-title">Reports</h1>
+        <h1 class="page-title">Reports & Audit</h1>
         <p class="page-subtitle">Download department expense statements as PDF or CSV, filtered by department and date range.</p>
     </div>
 </div>
@@ -45,6 +45,46 @@
         </div>
     </form>
 </div>
+
+{% if g.user['role'] != 'manager' %}
+<h3 class="card-title" style="margin: 2rem 0 1rem;">Activity Log</h3>
+<p class="page-subtitle" style="margin-top: -0.75rem; margin-bottom: 1rem;">A read-only record of every action across the system, most recent first.</p>
+
+<div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if entries %}
+                {% for e in entries %}
+                <tr>
+                    <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">{{ e.created_at }}</td>
+                    <td style="font-weight: 500;">{{ e.user_name or 'Unknown' }} <span style="color: var(--text-muted); font-size: 0.75rem;">({{ role_labels.get(e.user_role, e.user_role) or '-' }})</span></td>
+                    <td>
+                        <span class="stat-badge {% if e.action == 'delete' or e.action == 'deactivate' %}negative{% elif e.action == 'create' %}positive{% else %}neutral{% endif %}">
+                            {{ e.action|capitalize }}
+                        </span>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">{{ e.entity_type|capitalize }}{% if e.entity_id %} #{{ e.entity_id }}{% endif %}</td>
+                    <td>{{ e.details or '-' }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 3rem;">No activity recorded yet.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 
 {% endblock %}
 

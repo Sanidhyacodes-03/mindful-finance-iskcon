@@ -24,11 +24,7 @@ FONT_BOLD = "DejaVuSans-Bold"
 # appear here automatically — no code change needed. Until then, reports fall back
 # to text-only.
 LOGO_CANDIDATES = [
-    os.path.join(_STATIC_DIR, "images", "iskcon.jpg"),
-    os.path.join(_STATIC_DIR, "images", "iskcon.png"),
-    os.path.join(_STATIC_DIR, "images", "logo.png"),
-    os.path.join(_STATIC_DIR, "images", "logo.jpg"),
-    os.path.join(_STATIC_DIR, "images", "logo.jpeg"),
+    os.path.join(_STATIC_DIR, "images", "iskcon-shirpur-logo.jpeg"),
 ]
 
 

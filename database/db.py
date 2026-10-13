@@ -1,12 +1,14 @@
 import os
 import re
 import sqlite3
+import time
 import weakref
 from datetime import datetime, timedelta
 
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
+from flask import g, has_request_context
 
 from config import DATABASE_URL, IS_POSTGRES, PG_POOL_MINCONN, PG_POOL_MAXCONN
 from services.security import hash_password
@@ -31,6 +33,37 @@ _RETURNING_RE = re.compile(r'\bRETURNING\b', re.IGNORECASE)
 _pg_pool = None
 
 
+def _replace_placeholders(query):
+    """Replace '?' with '%s' only OUTSIDE single-quoted string literals.
+
+    A blind query.replace('?', '%s') is unsafe: found via live Postgres that
+    seed_db() has an alert message ending "...entry? Amount seems higher..." —
+    a literal '?' as English punctuation inside a string, not a placeholder.
+    Blindly replacing it corrupts the query and desyncs it from `params`,
+    raising "IndexError: tuple index out of range" deep inside psycopg2.
+    Handles '' as an escaped literal quote within a string, per standard SQL.
+    """
+    result = []
+    in_string = False
+    i = 0
+    n = len(query)
+    while i < n:
+        ch = query[i]
+        if ch == "'":
+            if in_string and i + 1 < n and query[i + 1] == "'":
+                result.append("''")
+                i += 2
+                continue
+            in_string = not in_string
+            result.append(ch)
+        elif ch == '?' and not in_string:
+            result.append('%s')
+        else:
+            result.append(ch)
+        i += 1
+    return ''.join(result)
+
+
 class _PGCursorWrapper:
     """Makes a psycopg2 DictCursor behave like sqlite3's cursor for this app's
     usage: '?' placeholders and a working .lastrowid after INSERTs."""
@@ -40,7 +73,14 @@ class _PGCursorWrapper:
         self.lastrowid = None
 
     def execute(self, query, params=None):
-        translated = query.replace('?', '%s')  # safe: no query text contains a literal '?'
+        # psycopg2 treats the whole query as a %-style format string, so any literal
+        # '%' already in the SQL text (e.g. "crossed 85% of its budget" in a message
+        # string) must be escaped to '%%' first, or it miscounts placeholders — found
+        # by actually running seed_db() against live Postgres, not caught by
+        # SQLite-only pytest. Must run before the '?' -> '%s' substitution (which is
+        # itself string-literal-aware — see _replace_placeholders), else it would
+        # double-escape the '%s' placeholders just inserted.
+        translated = _replace_placeholders(query.replace('%', '%%'))
         if _INSERT_RE.match(translated) and not _RETURNING_RE.search(translated):
             translated = translated.rstrip().rstrip(';') + ' RETURNING id'
             self._cursor.execute(translated, params or ())
@@ -62,13 +102,57 @@ class _PGCursorWrapper:
         return getattr(self._cursor, name)
 
 
+# A pooled connection can die while it sits idle (Supabase or the network drops
+# idle sessions), yet still look open client-side until it's used — the next
+# request then fails with "server/SSL connection closed unexpectedly". So any
+# connection idle longer than this is health-checked before being handed out.
+# Ones used more recently skip the check, keeping busy periods round-trip free.
+_IDLE_PING_SECONDS = 30
+_last_returned = {}  # id(raw connection) -> time.monotonic() it went back to the pool
+
+
+def _checkout_healthy(pool):
+    for _ in range(PG_POOL_MAXCONN + 1):
+        conn = pool.getconn()
+        idle = time.monotonic() - _last_returned.pop(id(conn), 0.0)
+        if not conn.closed and idle < _IDLE_PING_SECONDS:
+            return conn
+        if not conn.closed:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                conn.rollback()  # end the implicit transaction the ping opened
+                return conn
+            except psycopg2.Error:
+                pass
+        pool.putconn(conn, close=True)  # dead — discard; the pool opens a fresh one next
+    raise psycopg2.OperationalError("Could not get a working database connection from the pool.")
+
+
+def _return_to_pool(pool, conn):
+    # pool.putconn() rolls back an unfinished transaction first; on a connection
+    # that died mid-request that rollback raises, and the pool would then never
+    # free the slot. Fall back to discarding it so the slot is always released.
+    try:
+        _last_returned[id(conn)] = time.monotonic()
+        pool.putconn(conn)
+        if conn.closed:
+            _last_returned.pop(id(conn), None)
+    except Exception:
+        _last_returned.pop(id(conn), None)
+        try:
+            pool.putconn(conn, close=True)
+        except Exception:
+            pass
+
+
 class _PGConnectionWrapper:
     """Drop-in replacement for the sqlite3 connection object this app already
     uses: .cursor() / .commit() / .rollback() / .close()."""
 
     def __init__(self, pool):
         self._pool = pool
-        self._conn = pool.getconn()
+        self._conn = _checkout_healthy(pool)
         self._closed = False
         # Returns the connection to the pool even if a route raises before reaching
         # its db.close() call — none of app.py's ~30 get_db() call sites use
@@ -76,7 +160,12 @@ class _PGConnectionWrapper:
         # collected (effectively immediately under CPython refcounting once the
         # caller's local `db` variable goes out of scope), so this isn't relying
         # on an unpredictable GC cycle.
-        self._finalizer = weakref.finalize(self, pool.putconn, self._conn)
+        self._finalizer = weakref.finalize(self, _return_to_pool, pool, self._conn)
+        # ...except when a request raised: the traceback keeps `db` alive (and the
+        # debug-mode debugger keeps tracebacks around), so the finalizer may never
+        # run. Track it per request so teardown_request can release it regardless.
+        if has_request_context():
+            g.setdefault('_pg_connections', []).append(self)
 
     def cursor(self):
         real_cursor = self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -97,20 +186,66 @@ class _PGConnectionWrapper:
 def _get_pg_pool():
     global _pg_pool
     if _pg_pool is None:
-        _pg_pool = ThreadedConnectionPool(minconn=PG_POOL_MINCONN, maxconn=PG_POOL_MAXCONN, dsn=DATABASE_URL)
+        _pg_pool = ThreadedConnectionPool(
+            minconn=PG_POOL_MINCONN,
+            maxconn=PG_POOL_MAXCONN,
+            dsn=DATABASE_URL,
+            connect_timeout=10,
+            # TCP keepalives stop routers/firewalls from silently dropping idle
+            # pooled connections, and let a dead server be noticed promptly.
+            keepalives=1,
+            keepalives_idle=30,
+            keepalives_interval=10,
+            keepalives_count=3,
+        )
     return _pg_pool
+
+
+def release_request_connections():
+    """Return every pooled connection the current request checked out. Called
+    from app.py's teardown_request, so it runs even when the request raised.
+    Safe to call twice — close() is idempotent."""
+    for wrapper in g.pop('_pg_connections', []):
+        wrapper.close()
+
+
+# Whether Postgres is actually reachable — tested once, then cached for the rest
+# of the process. IS_POSTGRES (config.py) only means "DATABASE_URL is set"; this
+# is the real, effective answer everything below should branch on.
+#
+# Deliberately NOT catching the connection error here: if DATABASE_URL is set,
+# a failure to reach it now crashes app startup with the real psycopg2 exception
+# (host/DNS/auth/etc) instead of silently degrading to SQLite. That silent
+# fallback previously masked a real "why is this using SQLite" case where
+# DATABASE_URL genuinely wasn't reachable and the actual driver error was buried
+# in a one-line WARNING that's easy to miss. If you want the old graceful
+# degrade-to-SQLite-on-outage behavior back later, wrap the _get_pg_pool() call
+# below in the try/except this replaced.
+_pg_available = None
+
+
+def _postgres_available():
+    global _pg_available
+    if _pg_available is not None:
+        return _pg_available
+    if not IS_POSTGRES:
+        _pg_available = False
+        return False
+    _get_pg_pool()
+    _pg_available = True
+    return _pg_available
 
 
 def month_filter_sql(column_expr):
     """Dialect-aware month filter — both compare against '=  ?' with a 'YYYY-MM'
     value, against the existing 'YYYY-MM-DD' TEXT date columns."""
-    if IS_POSTGRES:
+    if _postgres_available():
         return f"LEFT({column_expr}, 7)"
     return f"strftime('%Y-%m', {column_expr})"
 
 
 def get_db():
-    if IS_POSTGRES:
+    if _postgres_available():
         return _PGConnectionWrapper(_get_pg_pool())
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -118,17 +253,59 @@ def get_db():
     return conn
 
 
+def _rename_legacy_roles(cursor):
+    """Idempotent role rename: admin -> accountant, auditor -> tmc_member.
+    Renames the role row in place (users keep their role_id). If the new row
+    already exists too, moves its users across and drops the old row."""
+    for old, new in (("admin", "accountant"), ("auditor", "tmc_member")):
+        cursor.execute("SELECT id FROM roles WHERE name = ?", (old,))
+        old_row = cursor.fetchone()
+        if not old_row:
+            continue
+        cursor.execute("SELECT id FROM roles WHERE name = ?", (new,))
+        new_row = cursor.fetchone()
+        if new_row:
+            cursor.execute("UPDATE users SET role_id = ? WHERE role_id = ?", (new_row[0], old_row[0]))
+            cursor.execute("DELETE FROM roles WHERE id = ?", (old_row[0],))
+        else:
+            cursor.execute("UPDATE roles SET name = ? WHERE id = ?", (new, old_row[0]))
+
+
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
 
-    if IS_POSTGRES:
+    if _postgres_available():
         # Schema is created once via supabase_schema.sql in the Supabase SQL Editor,
         # not auto-created here — see that file for the full CREATE TABLE statements.
         print("Postgres detected (DATABASE_URL set). Skipping schema auto-creation — "
               "run supabase_schema.sql in the Supabase SQL Editor once, if you haven't already.")
-        for role_name in ("admin", "auditor", "manager"):
+        _rename_legacy_roles(cursor)
+        for role_name in ("accountant", "tmc_member", "manager", "pending"):
             cursor.execute("INSERT INTO roles (name) VALUES (?) ON CONFLICT (name) DO NOTHING", (role_name,))
+        # Tables added after the initial supabase_schema.sql run are created here,
+        # idempotently, so an existing Supabase project picks them up on next start.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS donations (
+                id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                donor_name      TEXT NOT NULL,
+                amount          REAL NOT NULL,
+                payment_method  TEXT NOT NULL CHECK (payment_method IN ('Cash', 'UPI', 'Bank')),
+                transaction_id  TEXT,
+                notes           TEXT,
+                webhook_status  TEXT NOT NULL DEFAULT 'pending',
+                recorded_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # The person a query/alert is addressed to (NULL = everyone who can see
+        # its department, the original behaviour).
+        cursor.execute(
+            "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS assigned_to INTEGER "
+            "REFERENCES users(id) ON DELETE SET NULL"
+        )
+        # Donor's date of birth (optional).
+        cursor.execute("ALTER TABLE donations ADD COLUMN IF NOT EXISTS dob DATE")
         conn.commit()
         conn.close()
         return
@@ -148,7 +325,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
+        password_hash TEXT,
+        clerk_id TEXT UNIQUE,
         role_id INTEGER NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1,
         phone_number TEXT,
@@ -159,6 +337,16 @@ def init_db():
         FOREIGN KEY(role_id) REFERENCES roles(id)
     );
     """)
+
+    # Pre-existing local DBs (created before Clerk support) won't have this column —
+    # CREATE TABLE IF NOT EXISTS above is a no-op for them, so add it explicitly.
+    # (password_hash's old NOT NULL constraint can't be dropped in place on SQLite,
+    # but that's harmless: existing rows already have a password hash, and it's
+    # only ever a problem for Clerk-provisioned rows, which only exist going
+    # forward on freshly created databases.)
+    existing_columns = {row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()}
+    if "clerk_id" not in existing_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN clerk_id TEXT")
 
     # Departments Table
     cursor.execute("""
@@ -221,12 +409,18 @@ def init_db():
         resolved_by INTEGER,
         resolved_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        assigned_to INTEGER,
         FOREIGN KEY(department_id) REFERENCES departments(id) ON DELETE SET NULL,
         FOREIGN KEY(expense_id) REFERENCES expenses(id) ON DELETE SET NULL,
         FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
-        FOREIGN KEY(resolved_by) REFERENCES users(id) ON DELETE SET NULL
+        FOREIGN KEY(resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY(assigned_to) REFERENCES users(id) ON DELETE SET NULL
     );
     """)
+    # Existing local databases created before alerts.assigned_to existed.
+    alert_columns = {row[1] for row in cursor.execute("PRAGMA table_info(alerts)").fetchall()}
+    if "assigned_to" not in alert_columns:
+        cursor.execute("ALTER TABLE alerts ADD COLUMN assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL")
 
     # Audit Logs Table
     cursor.execute("""
@@ -242,8 +436,30 @@ def init_db():
     );
     """)
 
+    # Donations Table — webhook_status records whether the external API got it.
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS donations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        donor_name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        payment_method TEXT NOT NULL CHECK (payment_method IN ('Cash', 'UPI', 'Bank')),
+        transaction_id TEXT,
+        notes TEXT,
+        webhook_status TEXT NOT NULL DEFAULT 'pending',
+        recorded_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        dob DATE,
+        FOREIGN KEY(recorded_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+    """)
+    # Existing local databases created before donations.dob existed.
+    donation_columns = {row[1] for row in cursor.execute("PRAGMA table_info(donations)").fetchall()}
+    if "dob" not in donation_columns:
+        cursor.execute("ALTER TABLE donations ADD COLUMN dob DATE")
+
     # Fixed set of roles — idempotent, safe to run on every startup.
-    for role_name in ("admin", "auditor", "manager"):
+    _rename_legacy_roles(cursor)
+    for role_name in ("accountant", "tmc_member", "manager", "pending"):
         cursor.execute("INSERT OR IGNORE INTO roles (name) VALUES (?)", (role_name,))
 
     conn.commit()
@@ -273,13 +489,13 @@ def seed_db():
     manager_pass = hash_password("Manager@123")
 
     cursor.execute(
-        "INSERT INTO users (name, email, password_hash, role_id, phone_number) VALUES (?, ?, ?, (SELECT id FROM roles WHERE name = 'admin'), ?)",
+        "INSERT INTO users (name, email, password_hash, role_id, phone_number) VALUES (?, ?, ?, (SELECT id FROM roles WHERE name = 'accountant'), ?)",
         ("Radha Das", "admin@iskconshirpur.org", admin_pass, "+919876500001")
     )
     admin_id = cursor.lastrowid
 
     cursor.execute(
-        "INSERT INTO users (name, email, password_hash, role_id, phone_number) VALUES (?, ?, ?, (SELECT id FROM roles WHERE name = 'auditor'), ?)",
+        "INSERT INTO users (name, email, password_hash, role_id, phone_number) VALUES (?, ?, ?, (SELECT id FROM roles WHERE name = 'tmc_member'), ?)",
         ("Govind Sharma", "auditor@iskconshirpur.org", auditor_pass, "+919876500002")
     )
     auditor_id = cursor.lastrowid

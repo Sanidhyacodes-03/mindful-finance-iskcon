@@ -9,3 +9,9 @@ argon2-cffi==23.1.0
 apscheduler==3.11.3
 gunicorn==23.0.0
 psycopg2-binary==2.9.10
+clerk-backend-api==7.0.0
+google-api-python-client==2.200.0
+google-auth==2.59.1
+requests==2.34.2
+PyJWT==2.13.0
+cryptography==50.0.1

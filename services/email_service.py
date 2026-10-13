@@ -80,6 +80,43 @@ class EmailService:
         return cls._send(email, "Reset Your Spendly Password", html)
 
     @classmethod
+    def send_db_health_check_email(cls, email, db_ok, checked_at):
+        status_color = "#16a34a" if db_ok else "#dc2626"
+        status_text = "Active and responding" if db_ok else "Ping failed — check server logs"
+        html = f"""
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <h2 style="color: #4f46e5;">ISKCON Shirpur Finance — Weekly Database Health Check</h2>
+            <p>Status as of {checked_at.strftime('%Y-%m-%d %H:%M')}:</p>
+            <p style="font-size: 1.1em; font-weight: bold; color: {status_color};">{status_text}</p>
+            <p style="font-size: 0.85em; color: #64748b;">
+                This is an automated weekly check confirming the Supabase database is reachable
+                and the every-3-days keep-alive ping (which prevents the free-tier project from
+                pausing after 7 days of inactivity) is running.
+            </p>
+        </div>
+        """
+        subject = "✅ DB Health Check: OK" if db_ok else "⚠️ DB Health Check: FAILED"
+        return cls._send(email, subject, html)
+
+    @classmethod
+    def send_db_offline_alert(cls, email, error_message, checked_at):
+        html = f"""
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 2px solid #dc2626; border-radius: 12px;">
+            <h2 style="color: #dc2626;">🚨 URGENT: Database Offline</h2>
+            <p>The ISKCON Shirpur Finance daily keep-alive check could not reach the Supabase database
+            at {checked_at.strftime('%Y-%m-%d %H:%M')}.</p>
+            <p style="background: #fef2f2; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85em; color: #991b1b;">{error_message}</p>
+            <p><strong>What to check:</strong></p>
+            <ul>
+                <li>Supabase dashboard — if the project shows as <em>Paused</em>, click <em>Restore</em>.</li>
+                <li>Network/firewall on the server running the app (outbound port 5432).</li>
+                <li>That <code>DATABASE_URL</code> in the server's <code>.env</code> is still correct.</li>
+            </ul>
+        </div>
+        """
+        return cls._send(email, "🚨 URGENT: Database Offline — ISKCON Shirpur Finance", html)
+
+    @classmethod
     def send_bill_reminder_email(cls, email, name, bill_title, amount, due_date):
         html = f"""
         <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">

@@ -7,11 +7,7 @@
 <div style="max-width: 440px; margin: 3rem auto;">
     <div class="card">
         <div style="text-align: center; margin-bottom: 1.5rem;">
-            {% if logo_url %}
-                <img src="{{ logo_url }}" class="brand-logo-img" style="margin: 0 auto 0.75rem; height: 84px; max-width: 100%;" alt="ISKCON Shirpur">
-            {% else %}
-                <div class="brand-icon" style="margin: 0 auto 0.75rem; width: 42px; height: 42px; font-size: 1.2rem;">🪷</div>
-            {% endif %}
+            <img src="{{ url_for('static', filename='images/iskcon-shirpur-logo.jpeg') }}" class="brand-logo-img" style="margin: 0 auto 0.75rem; height: 84px; max-width: 100%;" alt="ISKCON Shirpur logo">
             <h1 style="font-family: var(--font-display); font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em;">Welcome back</h1>
             <p style="color: var(--text-muted); font-size: 0.9rem;">Sign in to ISKCON Shirpur Mindful Finance</p>
         </div>
@@ -22,24 +18,13 @@
             </div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('login') }}">
-            <div class="form-group">
-                <label for="email" class="form-label">Email address</label>
-                <input type="email" id="email" name="email" class="form-input" placeholder="nitish@example.com" required autofocus>
-            </div>
-
-            <div class="form-group">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                    <label for="password" class="form-label" style="margin-bottom: 0;">Password</label>
-                    <a href="{{ url_for('forgot_password') }}" style="font-size: 0.8rem; color: var(--primary);">Forgot password?</a>
-                </div>
-                <input type="password" id="password" name="password" class="form-input" placeholder="Your password" required>
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
-                Sign in to Dashboard →
-            </button>
-        </form>
+        {% if clerk_enabled %}
+            <div id="sign-in"></div>
+        {% else %}
+            <p style="text-align: center; color: var(--text-muted); padding: 1.5rem 0;">
+                Sign-in isn't configured yet. Contact your temple administrator.
+            </p>
+        {% endif %}
 
         <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
             Don't have an account? Contact your temple administrator for access.
@@ -47,4 +32,46 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{% if clerk_enabled %}
+<!-- Loaded from your Clerk Frontend API domain (clerk_frontend_api), not a generic
+     CDN (jsdelivr/unpkg) — this is what Clerk's own current docs specify for the
+     plain <script>-tag integration, confirmed by actually loading this exact tag
+     in the browser against the real ISKCON Shirpur Clerk instance: the SignIn
+     component rendered correctly (Google/Apple OAuth + email/phone OTP, "Secured
+     by Clerk" badge). data-clerk-publishable-key is what makes window.Clerk
+     self-initialize. Pinned to @5 deliberately (also verified live) — v6+
+     restructures UI into a separate @clerk/ui package requiring a second script
+     tag; switching without being able to re-test risks silently breaking mountSignIn. -->
+<script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key="{{ clerk_publishable_key }}"
+    src="https://{{ clerk_frontend_api }}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+></script>
+<script>
+    window.addEventListener('load', async () => {
+        await window.Clerk.load();
+
+        // Already signed in (typically: the 60-second session token expired and
+        // Clerk.load() just refreshed it) — go straight back to the page they
+        // were opening. The backend decides what they see; a new (pending)
+        // account is redirected to the approval holding page.
+        if (window.Clerk.user) {
+            window.location.replace({{ next_url|tojson }});
+            return;
+        }
+
+        // Covers both sign-in and the "Sign up" link inside the widget, so a
+        // brand-new account also lands in the app (and on the holding page).
+        window.Clerk.mountSignIn(document.getElementById('sign-in'), {
+            forceRedirectUrl: {{ next_url|tojson }},
+            signUpForceRedirectUrl: {{ next_url|tojson }},
+            routing: "virtual"
+        });
+    });
+</script>
+{% endif %}
 {% endblock %}

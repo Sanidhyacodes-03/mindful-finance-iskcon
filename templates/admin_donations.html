@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Donations — ISKCON Shirpur Finance{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Donations</h1>
+        {% if g.user['role'] == 'accountant' %}
+        <p class="page-subtitle">Record donations received. Each one is also sent to the external donations system.</p>
+        {% else %}
+        <p class="page-subtitle">All donations recorded by the Accountant. Your access is view-only.</p>
+        {% endif %}
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="{{ url_for('export_donations_csv') }}" class="btn btn-secondary">Download CSV</a>
+        <a href="{{ url_for('export_donations_pdf') }}" class="btn btn-secondary">Download PDF</a>
+        {% if g.user['role'] == 'accountant' %}
+        <form method="POST" action="{{ url_for('email_donations_report') }}"
+              onsubmit="return confirm('Email the donations CSV and PDF to the temple now?');">
+            <button type="submit" class="btn btn-primary">Send Report to Temple</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{# Only Accountants record donations; TMC Members see the table below only.
+   (POST /admin/add_donation is also Accountant-only on the server.) #}
+{% if g.user['role'] == 'accountant' %}
+<div class="card card--spiritual card--animate-in" style="margin-bottom: 2rem;">
+    <h3 class="card-title" style="margin-bottom: 1rem;">Log a Donation</h3>
+    <form method="POST" action="{{ url_for('add_donation') }}">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div class="form-group" style="flex: 2; min-width: 200px;">
+                <label for="donor_name" class="form-label">Donor Name</label>
+                <input type="text" id="donor_name" name="donor_name" class="form-input" maxlength="200" required>
+            </div>
+            <div class="form-group" style="flex: 1; min-width: 150px;">
+                <label for="dob" class="form-label">Date of Birth (optional)</label>
+                <input type="date" id="dob" name="dob" class="form-input" min="1900-01-01" max="{{ today_date }}">
+            </div>
+            <div class="form-group" style="flex: 1; min-width: 140px;">
+                <label for="amount" class="form-label">Amount (₹)</label>
+                <input type="number" id="amount" name="amount" class="form-input" min="0.01" step="0.01" required>
+            </div>
+            <div class="form-group" style="flex: 1; min-width: 140px;">
+                <label for="payment_method" class="form-label">Payment Method</label>
+                <select id="payment_method" name="payment_method" class="form-select" required>
+                    {% for m in payment_methods %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex: 1; min-width: 180px;">
+                <label for="transaction_id" class="form-label">Transaction ID (optional)</label>
+                <input type="text" id="transaction_id" name="transaction_id" class="form-input" maxlength="100" placeholder="UPI / bank reference">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="notes" class="form-label">Notes (optional)</label>
+            <textarea id="notes" name="notes" class="form-input" rows="2" maxlength="1000"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Record Donation</button>
+    </form>
+</div>
+{% endif %}
+
+<h3 class="card-title" style="margin-bottom: 1rem;">All Donations</h3>
+<div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Donor</th>
+                <th>Date of Birth</th>
+                <th style="text-align: right;">Amount</th>
+                <th>Method</th>
+                <th>Transaction ID</th>
+                <th>Notes</th>
+                <th>Recorded By</th>
+                <th>External Sync</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in donations %}
+            <tr>
+                <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">{{ d.created_at }}</td>
+                <td style="font-weight: 500;">{{ d.donor_name }}</td>
+                <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">{{ d.dob or '—' }}</td>
+                <td class="amount-col" style="text-align: right;">₹{{ "{:,.2f}".format(d.amount) }}</td>
+                <td>{{ d.payment_method }}</td>
+                <td style="color: var(--text-muted); font-size: 0.85rem;">{{ d.transaction_id or '—' }}</td>
+                <td style="color: var(--text-muted); font-size: 0.85rem; max-width: 260px;">{{ d.notes or '—' }}</td>
+                <td style="color: var(--text-muted); font-size: 0.85rem;">{{ d.recorded_by_name or '—' }}</td>
+                <td>
+                    {% if d.webhook_status == 'sent' %}
+                        <span class="stat-badge positive">Sent</span>
+                    {% elif d.webhook_status == 'failed' %}
+                        <span class="stat-badge negative">Not sent</span>
+                    {% else %}
+                        <span class="stat-badge neutral">{{ 'Not configured' if d.webhook_status == 'not configured' else 'Pending' }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 3rem;">No donations recorded yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
