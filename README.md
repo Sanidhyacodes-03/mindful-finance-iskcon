@@ -14,7 +14,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.1-000000?style=for-the-badge&logo=flask&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Clerk](https://img.shields.io/badge/Auth-Clerk-6C47FF?style=for-the-badge&logo=clerk&logoColor=white)
-![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)
+![HTTPS](https://img.shields.io/badge/Custom%20domain-HTTPS-0A66C2?style=for-the-badge&logo=letsencrypt&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-40%20passing-2EA44F?style=for-the-badge&logo=pytest&logoColor=white)
 
 [✨ Features](#-features) •
@@ -198,7 +198,7 @@ expense-tracker/
 ├── tests/test_app.py           # Automated tests (pytest)
 ├── supabase_schema.sql         # Database schema for a new Supabase project
 ├── requirements.txt
-└── Procfile                    # Render / gunicorn start command
+└── Procfile                    # Production start command (gunicorn)
 ```
 
 ---
@@ -268,15 +268,16 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ---
 
-## ☁️ Deploying to Render
+## 🌐 Production
 
-1. Create a **Web Service** from this repository.
-2. **Build command:** `pip install -r requirements.txt`
-3. **Start command:** comes from the `Procfile` — `gunicorn app:app --workers 1 --threads 4 --timeout 60`
-4. Add every setting from the table above under **Environment**, including `START_SCHEDULER=true`.
-5. Add your Render URL to the allowed origins in the Clerk dashboard.
+The app runs on its own **custom domain over HTTPS**.
 
-> Keep **one worker** so background jobs run exactly once.
+1. **Install:** `pip install -r requirements.txt`
+2. **Start:** `gunicorn app:app --workers 1 --threads 4 --timeout 60` (also in the `Procfile`)
+3. **Settings:** add every value from the table above to the server's environment, including `START_SCHEDULER=true`.
+4. **Sign-in:** use a Clerk **production** instance for the domain (`pk_live_` / `sk_live_` keys) with its DNS records verified.
+
+> Keep **one worker** so background jobs run exactly once, and keep the server always on so the weekly report and keep-alive jobs never miss a run.
 
 ---
 
@@ -289,7 +290,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 | Sign-in | Clerk (OTP, Google) · PyJWT local verification |
 | Documents | ReportLab (PDF) · Python `csv` |
 | Automation | APScheduler · smtplib · Google Drive API |
-| Hosting | Render · gunicorn |
+| Hosting | gunicorn · custom domain with HTTPS |
 | Testing | pytest (40 tests) |
 
 ---

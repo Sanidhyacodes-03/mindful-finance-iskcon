@@ -656,9 +656,21 @@ def test_clerk_session_token_is_verified_locally_without_network(monkeypatch):
     claims, expired = check(_sign_clerk_token(key, iat=now - 120, nbf=now - 120, exp=now - 60))
     assert claims is None and expired
 
-    assert check(_sign_clerk_token(other_key)) == (None, False)                    # forged signature
     assert check(_sign_clerk_token(key, azp="https://evil.example")) == (None, False)  # other site
     assert check("not-a-jwt") == (None, False)
+
+    # A forged signature may look up Clerk's published keys once (rate-limited) — and still fails.
+    class EmptyJwks:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"keys": []}
+
+    monkeypatch.setattr(clerk_auth, "_jwks_keys", {})
+    monkeypatch.setattr(clerk_auth, "_jwks_fetched_at", 0.0)
+    monkeypatch.setattr(requests, "get", lambda url, headers, timeout: EmptyJwks())
+    assert check(_sign_clerk_token(other_key)) == (None, False)
 
 
 def test_clerk_signing_keys_are_fetched_once_then_cached(monkeypatch):
@@ -1029,4 +1041,37 @@ def test_placeholder_clerk_jwt_key_falls_back_to_published_keys(monkeypatch):
     monkeypatch.setattr(clerk_auth.requests, "get", lambda url, headers, timeout: Response())
 
     with app.test_request_context('/finances', headers={"Cookie": f"__session={_sign_clerk_token(key)}"}):
+        assert clerk_auth.authenticate_clerk_request(clerk_auth.request)["sub"] == "user_abc"
+
+
+def test_wrong_instance_clerk_jwt_key_falls_back_to_published_keys(monkeypatch):
+    """CLERK_JWT_KEY left as the development key after switching to production
+    Clerk keys must not lock everyone out."""
+    import json
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from jwt.algorithms import RSAAlgorithm
+    import config
+    import services.clerk_auth as clerk_auth
+
+    production_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    development_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = json.loads(RSAAlgorithm.to_jwk(production_key.public_key()))
+    jwk.update(kid="ins_test", alg="RS256", use="sig")
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"keys": [jwk]}
+
+    monkeypatch.setattr(config, "CLERK_SECRET_KEY", "sk_live_dummy")
+    monkeypatch.setattr(config, "CLERK_JWT_KEY", development_key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode())
+    monkeypatch.setattr(clerk_auth, "_jwks_keys", {})
+    monkeypatch.setattr(clerk_auth, "_jwks_fetched_at", 0.0)
+    monkeypatch.setattr(clerk_auth.requests, "get", lambda url, headers, timeout: Response())
+
+    with app.test_request_context('/finances', headers={"Cookie": f"__session={_sign_clerk_token(production_key)}"}):
         assert clerk_auth.authenticate_clerk_request(clerk_auth.request)["sub"] == "user_abc"

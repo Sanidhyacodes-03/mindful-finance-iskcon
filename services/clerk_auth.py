@@ -96,11 +96,19 @@ def _configured_jwt_key():
     return _configured_keys[pem]
 
 
-def _signing_key(kid):
-    if config.CLERK_JWT_KEY:
-        key = _configured_jwt_key()
-        if key is not None:
-            return key
+_mismatch_warned = False
+
+
+def _warn_jwt_key_mismatch():
+    global _mismatch_warned
+    if not _mismatch_warned:
+        _mismatch_warned = True
+        logger.error("CLERK_JWT_KEY doesn't match the Clerk instance that signed this session "
+                     "(e.g. development key with production Clerk keys) — update or remove it.")
+
+
+def _published_key(kid):
+    """Clerk's own published key for this key id (JWKS, fetched once and kept)."""
     key = _jwks_keys.get(kid)
     if key is not None:
         return key
@@ -130,19 +138,35 @@ def verify_session_token(token, flask_request):
     except jwt.InvalidTokenError:
         return None, False
 
-    key = _signing_key(kid)
-    if key is None:
-        return None, False
+    configured = _configured_jwt_key() if config.CLERK_JWT_KEY else None
+    candidates = [configured] if configured is not None else []
+    candidates.append(None)  # placeholder: Clerk's published key, looked up only if needed
 
-    try:
-        claims = jwt.decode(
-            token, key, algorithms=["RS256"], leeway=_CLOCK_SKEW_SECONDS,
-            options={"require": ["exp", "iat", "sub"], "verify_aud": False},
-        )
-    except jwt.ExpiredSignatureError:
-        return None, True
-    except jwt.PyJWTError:
-        # Invalid token, or a key PyJWT can't use — treat as signed out, never a 500.
+    claims = None
+    for key in candidates:
+        if key is None:
+            key = _published_key(kid)
+            if key is None:
+                return None, False
+        try:
+            claims = jwt.decode(
+                token, key, algorithms=["RS256"], leeway=_CLOCK_SKEW_SECONDS,
+                options={"require": ["exp", "iat", "sub"], "verify_aud": False},
+            )
+            break
+        except jwt.ExpiredSignatureError:
+            return None, True
+        except jwt.InvalidSignatureError:
+            if key is configured:
+                # CLERK_JWT_KEY is from a different Clerk instance — typically still the
+                # development key after switching to production. Try Clerk's own key.
+                _warn_jwt_key_mismatch()
+                continue
+            return None, False
+        except jwt.PyJWTError:
+            # Invalid token, or a key PyJWT can't use — treat as signed out, never a 500.
+            return None, False
+    if claims is None:
         return None, False
 
     if not _azp_matches_host(claims.get("azp"), flask_request):
